@@ -175,13 +175,14 @@ impl Client
         }
 
         // cleanup connections 
+        // TODO: Move to LoadBalancer -> addition and removeal of connections
         self.cleanup_connections();
 
         Ok(())
     }
 
     //TODO: LOGGING
-    fn cleanup_connections(&mut self)
+    fn cleanup_connections(&mut self) -> Vec<Connection>
     {
         let mut to_delete : Vec<usize> = vec![];
 
@@ -201,10 +202,14 @@ impl Client
             }
         }
 
+        let mut out : Vec<Connection> = vec![];
+
         for i in to_delete.iter()
         {
-            self.connections.remove(*i);
+            out.push(self.connections.remove(*i));
         }
+
+        out
     }
 }
 
@@ -217,6 +222,8 @@ enum PartialConnState
     ERROR,
 }
 
+
+//TODO: Not testing *YET* -- does nothing but act as a stub for encryption
 struct PartialConnection
 {
     down_stream         : std::net::TcpStream,
@@ -270,6 +277,7 @@ impl PartialConnection
     }
 }
 
+#[derive(Clone, PartialEq, Eq, Debug)]
 enum ConnState
 {
     INIT,
@@ -310,6 +318,8 @@ impl Connection
 
     fn poll(&mut self) -> Result<(), Box<dyn std::error::Error>>
     {
+        let mut next_state = self.conn_state.clone();
+
         match self.conn_state
         {
             ConnState::INIT =>
@@ -346,7 +356,7 @@ impl Connection
                             },
                             Err(e) =>
                             {
-                                // TODO: Handle errors
+                                next_state = ConnState::UP_DISCONNECT;
                             }
                         }
                     },
@@ -356,9 +366,7 @@ impl Connection
                     },
                     Err(e) =>
                     {
-                        // TODO: handle error types
-                        // TODO: log and remove stream
-
+                        next_state = ConnState::DOWN_DISCONNECT;
                     }
                 }
 
@@ -379,7 +387,7 @@ impl Connection
                             },
                             Err(e) =>
                             {
-                                // TODO: Handle errors
+                                next_state = ConnState::DOWN_DISCONNECT;
                             }
                         }
                     },
@@ -389,9 +397,7 @@ impl Connection
                     },
                     Err(e) =>
                     {
-                        // TODO: handle error types
-                        // TODO: log and remove stream
-
+                        next_state = ConnState::UP_DISCONNECT;
                     }
                 }
             },
@@ -404,8 +410,379 @@ impl Connection
             }
         }
 
+        self.conn_state = next_state;
+
         Ok(())
     }
+}
+
+#[test]
+fn test_connection_both_connected_data_transfer()
+{
+    let lb_addr: String = "127.0.0.1:25006".into();
+    let us_addr: String = "127.0.0.1:25007".into();
+
+    let lb_listener = std::net::TcpListener::bind(lb_addr.clone()).unwrap();
+    lb_listener.set_nonblocking(true).unwrap();
+
+    let us_listener = std::net::TcpListener::bind(us_addr.clone()).unwrap();
+    us_listener.set_nonblocking(true).unwrap();
+
+    let point_one_milli = Duration::from_micros(100);
+    let mut client = TcpStream::connect(lb_addr).unwrap();
+    client.set_read_timeout(Some(point_one_milli.clone())).unwrap();
+    client.set_write_timeout(Some(point_one_milli.clone())).unwrap();
+    client.set_nonblocking(true).unwrap();
+    client.set_nodelay(true).unwrap();
+
+    let mut up_stream = TcpStream::connect(us_addr).unwrap();
+    up_stream.set_read_timeout(Some(point_one_milli.clone())).unwrap();
+    up_stream.set_write_timeout(Some(point_one_milli.clone())).unwrap();
+    up_stream.set_nonblocking(true).unwrap();
+    up_stream.set_nodelay(true).unwrap();
+
+    let mut down_stream : Option<std::net::TcpStream> = None;
+    let mut up_server_stream : Option<std::net::TcpStream> = None;
+
+    loop
+    {
+        let mut should_break = false;
+
+        for stream_res in lb_listener.incoming()
+        {
+		    match stream_res
+		    {
+		        Ok(strm) =>
+			    {
+                    strm.set_read_timeout(Some(point_one_milli.clone())).unwrap();
+                    strm.set_write_timeout(Some(point_one_milli.clone())).unwrap();
+                    strm.set_nonblocking(true).unwrap();
+                    strm.set_nodelay(true).unwrap();
+                    down_stream = Some(strm);
+                    should_break = true;
+                },
+    		    Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock =>
+    		    { 
+				    break;
+    		    },
+    		    Err(e) =>
+    		    {
+                    assert!(false);
+			    }
+            }
+        }
+        if should_break
+        {
+            break;
+        }
+    }
+
+    loop
+    {
+        let mut should_break = false;
+
+        for stream_res in us_listener.incoming()
+        {
+		    match stream_res
+		    {
+		        Ok(strm) =>
+			    {
+                    strm.set_read_timeout(Some(point_one_milli.clone())).unwrap();
+                    strm.set_write_timeout(Some(point_one_milli.clone())).unwrap();
+                    strm.set_nonblocking(true).unwrap();
+                    strm.set_nodelay(true).unwrap();
+                    up_server_stream = Some(strm);
+                    should_break = true;
+                },
+    		    Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock =>
+    		    { 
+				    break;
+    		    },
+    		    Err(e) =>
+    		    {
+                    assert!(false);
+			    }
+            }
+        }
+
+        if should_break
+        {
+            break;
+        }
+    }
+
+    let mut cxn = Connection::new(down_stream.unwrap(), up_stream, 0, 0).unwrap(); 
+
+    client.write_all("HELLO".as_bytes());
+    up_server_stream.as_ref().unwrap().write_all("GOODBYE".as_bytes()).unwrap();
+
+    cxn.poll().unwrap();
+
+    let mut buf : [u8; 8] = [0; 8];
+    match up_server_stream.as_ref().unwrap().read(&mut buf)
+    {
+        Ok(n) =>
+        {
+            assert!(buf[0..n] == *"HELLO".as_bytes());
+        },
+        Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock =>
+        {
+            // wait for next poll
+            assert!(false);
+        },
+        Err(e) =>
+        {
+            assert!(false);
+        }
+    }
+
+    let mut buf : [u8; 8] = [0; 8];
+    match client.read(&mut buf)
+    {
+        Ok(n) =>
+        {
+            assert!(buf[0..n] == *"GOODBYE".as_bytes());
+        },
+        Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock =>
+        {
+            // wait for next poll
+            assert!(false);
+        },
+        Err(e) =>
+        {
+            assert!(false);
+        }
+    }
+
+    assert!(cxn.conn_state == ConnState::OKAY);
+}
+
+#[test]
+fn test_connection_both_connected_client_drops()
+{
+    let lb_addr: String = "127.0.0.1:25008".into();
+    let us_addr: String = "127.0.0.1:25009".into();
+
+    let lb_listener = std::net::TcpListener::bind(lb_addr.clone()).unwrap();
+    lb_listener.set_nonblocking(true).unwrap();
+
+    let us_listener = std::net::TcpListener::bind(us_addr.clone()).unwrap();
+    us_listener.set_nonblocking(true).unwrap();
+
+    let point_one_milli = Duration::from_micros(100);
+    let mut client : Option<TcpStream> = Some(TcpStream::connect(lb_addr).unwrap());
+    client.as_ref().unwrap().set_read_timeout(Some(point_one_milli.clone())).unwrap();
+    client.as_ref().unwrap().set_write_timeout(Some(point_one_milli.clone())).unwrap();
+    client.as_ref().unwrap().set_nonblocking(true).unwrap();
+    client.as_ref().unwrap().set_nodelay(true).unwrap();
+
+    let mut up_stream = TcpStream::connect(us_addr).unwrap();
+    up_stream.set_read_timeout(Some(point_one_milli.clone())).unwrap();
+    up_stream.set_write_timeout(Some(point_one_milli.clone())).unwrap();
+    up_stream.set_nonblocking(true).unwrap();
+    up_stream.set_nodelay(true).unwrap();
+
+    let mut down_stream : Option<std::net::TcpStream> = None;
+    let mut up_server_stream : Option<std::net::TcpStream> = None;
+
+    loop
+    {
+        let mut should_break = false;
+
+        for stream_res in lb_listener.incoming()
+        {
+		    match stream_res
+		    {
+		        Ok(strm) =>
+			    {
+                    strm.set_read_timeout(Some(point_one_milli.clone())).unwrap();
+                    strm.set_write_timeout(Some(point_one_milli.clone())).unwrap();
+                    strm.set_nonblocking(true).unwrap();
+                    strm.set_nodelay(true).unwrap();
+                    down_stream = Some(strm);
+                    should_break = true;
+                },
+    		    Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock =>
+    		    { 
+				    break;
+    		    },
+    		    Err(e) =>
+    		    {
+                    assert!(false);
+			    }
+            }
+        }
+        if should_break
+        {
+            break;
+        }
+    }
+
+    loop
+    {
+        let mut should_break = false;
+
+        for stream_res in us_listener.incoming()
+        {
+		    match stream_res
+		    {
+		        Ok(strm) =>
+			    {
+                    strm.set_read_timeout(Some(point_one_milli.clone())).unwrap();
+                    strm.set_write_timeout(Some(point_one_milli.clone())).unwrap();
+                    strm.set_nonblocking(true).unwrap();
+                    strm.set_nodelay(true).unwrap();
+                    up_server_stream = Some(strm);
+                    should_break = true;
+                },
+    		    Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock =>
+    		    { 
+				    break;
+    		    },
+    		    Err(e) =>
+    		    {
+                    assert!(false);
+			    }
+            }
+        }
+
+        if should_break
+        {
+            break;
+        }
+    }
+
+    let mut cxn = Connection::new(down_stream.unwrap(), up_stream, 0, 0).unwrap(); 
+
+
+    cxn.poll().unwrap();
+
+    client = None;
+
+    cxn.poll().unwrap();
+    cxn.poll().unwrap();
+    cxn.poll().unwrap();
+
+    //TODO: HMMMMMM
+    //This fails right now.
+    println!("{:?}", cxn.conn_state);
+    assert!(cxn.conn_state == ConnState::DOWN_DISCONNECT);
+}
+
+#[test]
+fn test_connection_both_connected_upstream_drops()
+{
+    let lb_addr: String = "127.0.0.1:25010".into();
+    let us_addr: String = "127.0.0.1:25011".into();
+
+    let lb_listener = std::net::TcpListener::bind(lb_addr.clone()).unwrap();
+    lb_listener.set_nonblocking(true).unwrap();
+
+    let us_listener = std::net::TcpListener::bind(us_addr.clone()).unwrap();
+    us_listener.set_nonblocking(true).unwrap();
+
+    let point_one_milli = Duration::from_micros(100);
+    let mut client = TcpStream::connect(lb_addr).unwrap();
+    client.set_read_timeout(Some(point_one_milli.clone())).unwrap();
+    client.set_write_timeout(Some(point_one_milli.clone())).unwrap();
+    client.set_nonblocking(true).unwrap();
+    client.set_nodelay(true).unwrap();
+
+    let mut up_stream = TcpStream::connect(us_addr).unwrap();
+    up_stream.set_read_timeout(Some(point_one_milli.clone())).unwrap();
+    up_stream.set_write_timeout(Some(point_one_milli.clone())).unwrap();
+    up_stream.set_nonblocking(true).unwrap();
+    up_stream.set_nodelay(true).unwrap();
+
+    let mut down_stream : Option<std::net::TcpStream> = None;
+    let mut up_server_stream : Option<std::net::TcpStream> = None;
+
+    loop
+    {
+        let mut should_break = false;
+
+        for stream_res in lb_listener.incoming()
+        {
+		    match stream_res
+		    {
+		        Ok(strm) =>
+			    {
+                    strm.set_read_timeout(Some(point_one_milli.clone())).unwrap();
+                    strm.set_write_timeout(Some(point_one_milli.clone())).unwrap();
+                    strm.set_nonblocking(true).unwrap();
+                    strm.set_nodelay(true).unwrap();
+                    down_stream = Some(strm);
+                    should_break = true;
+                },
+    		    Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock =>
+    		    { 
+				    break;
+    		    },
+    		    Err(e) =>
+    		    {
+                    assert!(false);
+			    }
+            }
+        }
+        if should_break
+        {
+            break;
+        }
+    }
+
+    loop
+    {
+        let mut should_break = false;
+
+        for stream_res in us_listener.incoming()
+        {
+		    match stream_res
+		    {
+		        Ok(strm) =>
+			    {
+                    strm.set_read_timeout(Some(point_one_milli.clone())).unwrap();
+                    strm.set_write_timeout(Some(point_one_milli.clone())).unwrap();
+                    strm.set_nonblocking(true).unwrap();
+                    strm.set_nodelay(true).unwrap();
+                    up_server_stream = Some(strm);
+                    should_break = true;
+                },
+    		    Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock =>
+    		    { 
+				    break;
+    		    },
+    		    Err(e) =>
+    		    {
+                    assert!(false);
+			    }
+            }
+        }
+
+        if should_break
+        {
+            break;
+        }
+    }
+
+    let mut cxn = Connection::new(down_stream.unwrap(), up_stream, 0, 0).unwrap(); 
+
+
+    cxn.poll().unwrap();
+
+    up_server_stream = None;
+
+    cxn.poll().unwrap();
+    cxn.poll().unwrap();
+    cxn.poll().unwrap();
+
+    println!("{:?}", cxn.conn_state);
+    assert!(cxn.conn_state == ConnState::DOWN_DISCONNECT);
+}
+
+#[test]
+fn test_connection_client_connected_upstream_down()
+{
+    //TODO!
 }
 
 // TODO: Server health should be put in a thread

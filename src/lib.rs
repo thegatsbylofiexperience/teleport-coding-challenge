@@ -524,7 +524,7 @@ enum UpstreamState
     UNHEALTHY,
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 enum PingState
 {
     IDLE(i64),
@@ -580,7 +580,7 @@ impl HealthChecker
                         },
                         Err(e) =>
                         {
-                            //TODO: Log
+                            println!("{e}");
                             self.upstream_state = UpstreamState::UNHEALTHY;
                             // keep state as idle
                         }
@@ -635,7 +635,7 @@ impl HealthChecker
                                 if n == 4 && &buf[0..n] == "PONG".as_bytes()
                                 {
                                     // if/when pong received check timestamp
-                                    if now > (timestamp + 1)
+                                    if now > timestamp
                                     {
                                         // if pong not received within 1 second
                                         // mark unhealthy
@@ -656,7 +656,11 @@ impl HealthChecker
                             },
                             Err(e) =>
                             {
-                                // TODO: handle error types
+                                // Connection is in error, as such, it is 
+                                // UNHEALTHY -> set it as such
+                                self.upstream_state = UpstreamState::UNHEALTHY;
+                                self.up_stream = None;
+                                next_state = PingState::IDLE(now);
                             }
                         }
                     }
@@ -673,5 +677,261 @@ impl HealthChecker
     {
         return self.upstream_state == UpstreamState::HEALTHY
     }
+}
+
+//Server Group Tests
+#[test]
+fn test_server_health_not_listening()
+{
+    let mut hc = HealthChecker::new(0, "127.0.0.1:25001".into());
+
+    hc.poll().unwrap();
+
+    assert!(hc.upstream_state == UpstreamState::UNHEALTHY);
+}
+
+#[test]
+fn test_server_health_connect()
+{
+    let addr: String = "127.0.0.1:25002".into();
+
+    let listener = std::net::TcpListener::bind(addr.clone()).unwrap();
+    listener.set_nonblocking(true).unwrap();
+
+    let mut hc = HealthChecker::new(0, addr);
+
+    let mut stream : Option<TcpStream> = None;
+
+    for stream_res in listener.incoming()
+    {
+		match stream_res
+		{
+		    Ok(strm) =>
+			{
+                stream = Some(strm);
+            },
+    		Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock =>
+    		{
+				// Do nothing we will 
+				break;
+    		},
+    		Err(e) =>
+    		{
+                assert!(false);
+			}
+        }
+    }
+
+    hc.poll().unwrap();
+
+    assert!(hc.upstream_state == UpstreamState::HEALTHY);
+}
+
+#[test]
+fn test_server_health_reply_in_time()
+{
+    let addr: String = "127.0.0.1:25003".into();
+
+    let listener = std::net::TcpListener::bind(addr.clone()).unwrap();
+    listener.set_nonblocking(true).unwrap();
+
+    let mut hc = HealthChecker::new(0, addr);
+
+    hc.poll().unwrap();
+
+    let mut stream : Option<TcpStream> = None;
+
+    loop
+    {
+        let mut should_break = false;
+
+        for stream_res in listener.incoming()
+        {
+		    match stream_res
+		    {
+		        Ok(strm) =>
+			    {
+                    stream = Some(strm);
+                    should_break = true;
+                },
+    		    Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock =>
+    		    { 
+				    break;
+    		    },
+    		    Err(e) =>
+    		    {
+                    // TODO: Log Error
+				    //return Err(e.into());
+			    }
+            }
+        }
+
+        if should_break
+        {
+            break;
+        }
+    }
+
+    hc.poll().unwrap();
+
+    assert!(hc.upstream_state == UpstreamState::HEALTHY);
+
+    let mut buf : [u8; 4] = [0; 4];
+    match stream.as_ref().unwrap().read(&mut buf)
+    {
+        Ok(n) =>
+        {
+            if n == 4 && buf[0..n] == *"PING".as_bytes()
+            {
+                // Send back "PONG"
+                stream.as_ref().unwrap().write_all("PONG".as_bytes()).unwrap();
+            }
+        },
+        Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock =>
+        {
+            // wait for next poll
+        },
+        Err(e) =>
+        {
+            assert!(false);
+        }
+    }
+
+    hc.poll().unwrap();
+
+    assert!(hc.upstream_state == UpstreamState::HEALTHY);
+}
+
+#[test]
+fn test_server_health_reply_out_of_time()
+{
+    let addr: String = "127.0.0.1:25004".into();
+
+    let listener = std::net::TcpListener::bind(addr.clone()).unwrap();
+    listener.set_nonblocking(true).unwrap();
+
+    let mut hc = HealthChecker::new(0, addr);
+
+    hc.poll().unwrap();
+
+    let mut stream : Option<TcpStream> = None;
+
+    loop
+    {
+        let mut should_break = false;
+
+        for stream_res in listener.incoming()
+        {
+		    match stream_res
+		    {
+		        Ok(strm) =>
+			    {
+                    stream = Some(strm);
+                    should_break = true;
+                },
+    		    Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock =>
+    		    { 
+				    break;
+    		    },
+    		    Err(e) =>
+    		    {
+                    assert!(false);
+			    }
+            }
+        }
+
+        if should_break
+        {
+            break;
+        }
+    }
+
+    hc.poll().unwrap();
+
+    assert!(hc.upstream_state == UpstreamState::HEALTHY);
+
+    let period = std::time::Duration::from_millis(1100);
+    std::thread::sleep(period);
+
+    let mut buf : [u8; 4] = [0; 4];
+    match stream.as_ref().unwrap().read(&mut buf)
+    {
+        Ok(n) =>
+        {
+            if n == 4 && buf[0..n] == *"PING".as_bytes()
+            {
+                // Send back "PONG"
+                stream.as_ref().unwrap().write_all("PONG".as_bytes()).unwrap();
+            }
+        },
+        Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock =>
+        {
+            // wait for next poll
+        },
+        Err(e) =>
+        {
+            assert!(false);
+        }
+    }
+
+    hc.poll().unwrap();
+
+    assert!(hc.upstream_state == UpstreamState::UNHEALTHY);
+}
+
+#[test]
+fn test_server_health_reply_disconnect_from_upstream()
+{
+    let addr: String = "127.0.0.1:25005".into();
+
+    let listener = std::net::TcpListener::bind(addr.clone()).unwrap();
+    listener.set_nonblocking(true).unwrap();
+
+    let mut hc = HealthChecker::new(0, addr);
+
+    hc.poll().unwrap();
+
+    let mut stream : Option<TcpStream> = None;
+
+    loop
+    {
+        let mut should_break = false;
+
+        for stream_res in listener.incoming()
+        {
+		    match stream_res
+		    {
+		        Ok(strm) =>
+			    {
+                    stream = Some(strm);
+                    should_break = true;
+                },
+    		    Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock =>
+    		    { 
+				    break;
+    		    },
+    		    Err(e) =>
+    		    {
+                    // TODO: Log Error
+				    //return Err(e.into());
+			    }
+            }
+        }
+
+        if should_break
+        {
+            break;
+        }
+    }
+
+    hc.poll().unwrap();
+
+    assert!(hc.upstream_state == UpstreamState::HEALTHY);
+
+    stream = None;
+
+    hc.poll().unwrap();
+
+    assert!(hc.upstream_state == UpstreamState::UNHEALTHY);
 }
 

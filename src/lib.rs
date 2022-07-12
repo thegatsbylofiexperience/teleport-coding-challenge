@@ -410,6 +410,7 @@ impl Connection
 
 // TODO: Server health should be put in a thread
 // TODO: Server health should complete a connection within some period
+// TODO: Connections need to be accounted for.
 struct ServerGroup
 {
     id              : u32,
@@ -423,6 +424,39 @@ impl ServerGroup
     fn new(id : u32) -> Self
     {
         Self { id, server_addrs: HashMap::new(), cxn_cntr: HashMap::new(), server_health: HashMap::new() }
+    }
+
+    fn add_connection(&mut self, id: &u32)
+    {
+        if let Some(cxn_cnt) = self.cxn_cntr.get_mut(id)
+        {
+            *cxn_cnt += 1;
+        }
+        else
+        {
+            self.cxn_cntr.insert(*id, 1);
+        }
+    }
+
+    fn remove_connection(&mut self, id: &u32)
+    {
+        if let Some(cxn_cnt) = self.cxn_cntr.get_mut(id)
+        {
+            if cxn_cnt > &mut 0
+            {
+                *cxn_cnt -= 1;
+            }
+            else
+            {
+                // should not happen
+                // probably would log if not a coding challenge
+            }
+        }
+        else
+        {
+            // should not happen
+            // probably would log if not a coding challenge
+        }
     }
 
     fn find_min(&self) -> Option<u32>
@@ -496,16 +530,6 @@ impl ServerGroup
         min_id
     }
 
-    fn find_least_connected_and_healthy_server(&self) -> Option<&String>
-    {
-        if let Some(server_id) = self.find_min_and_healthy()
-        {
-            return self.server_addrs.get(&server_id);
-        }
-
-        None
-    }
-
     fn poll(&mut self) -> Result<(), Box<dyn std::error::Error>>
     {
         for (k, v) in self.server_health.iter_mut()
@@ -514,6 +538,235 @@ impl ServerGroup
         }
 
         Ok(())
+    }
+}
+
+#[test]
+fn test_server_group_find_min()
+{
+    let mut sg = ServerGroup::new(0);
+
+    for i in 0..5
+    {
+        sg.server_addrs.insert(i, "".into());
+    }
+
+    let mut cnt : usize = 0;
+    for i in 0..10
+    {
+        if let Some(id) = sg.find_min()
+        {
+            cnt += 1;
+
+            sg.add_connection(&id);
+        }
+
+    }
+
+    assert!(cnt == 10);
+
+    for i in 0..5
+    {
+        if let Some(cnt) = sg.cxn_cntr.get(&i)
+        {
+            assert!(cnt == &2);
+        }
+        else
+        {
+            // ID should be there
+            assert!(false);
+        }
+    }
+}
+
+#[test]
+fn test_server_group_add_and_remove_connections()
+{
+    let mut sg = ServerGroup::new(0);
+
+    for i in 0..5
+    {
+        sg.server_addrs.insert(i, "".into());
+    }
+
+    let mut cnt : usize = 0;
+    for i in 0..10
+    {
+        if let Some(id) = sg.find_min()
+        {
+            cnt += 1;
+
+            sg.add_connection(&id);
+        }
+
+    }
+
+    for i in 0..5
+    {
+        sg.remove_connection(&i)
+    }
+
+    assert!(cnt == 10);
+
+    for i in 0..5
+    {
+        if let Some(cnt) = sg.cxn_cntr.get(&i)
+        {
+            assert!(cnt == &1);
+        }
+        else
+        {
+            // ID should be there
+            assert!(false);
+        }
+    }
+}
+
+#[test]
+fn test_server_group_find_min_and_healthy()
+{
+
+    let mut sg = ServerGroup::new(0);
+
+    for i in 0..5
+    {
+        sg.server_addrs.insert(i, "".into());
+        sg.server_health.insert(i, HealthChecker::new(i, "".into()));
+    }
+
+    let mut cnt : usize = 0;
+    for i in 0..10
+    {
+        if let Some(id) = sg.find_min_and_healthy()
+        {
+            cnt += 1;
+
+            sg.add_connection(&id);
+        }
+
+    }
+
+    assert!(cnt == 10);
+
+    for i in 0..5
+    {
+        if let Some(cnt) = sg.cxn_cntr.get(&i)
+        {
+            assert!(cnt == &2);
+        }
+        else
+        {
+            // ID should be there
+            assert!(false);
+        }
+    }
+}
+
+#[test]
+fn test_server_group_find_min_and_some_unhealthy()
+{
+
+    let mut sg = ServerGroup::new(0);
+
+    for i in 0..5
+    {
+        sg.server_addrs.insert(i, "".into());
+
+        let mut hc =  HealthChecker::new(i, "".into());
+
+        hc.upstream_state = UpstreamState::UNHEALTHY;
+
+        sg.server_health.insert(i, hc);
+    }
+
+    let mut cnt : usize = 0;
+    for i in 0..10
+    {
+        if let Some(id) = sg.find_min_and_healthy()
+        {
+            cnt += 1;
+
+            sg.add_connection(&id);
+        }
+
+    }
+
+    assert!(cnt == 0);
+
+    for i in 0..5
+    {
+        if let Some(cnt) = sg.cxn_cntr.get(&i)
+        {
+            assert!(false);
+        }
+        else
+        {
+            // ID should be there
+            assert!(true);
+        }
+    }
+}
+
+#[test]
+fn test_server_group_find_min_and_all_unhealthy()
+{
+
+    let mut sg = ServerGroup::new(0);
+
+    for i in 0..5
+    {
+        sg.server_addrs.insert(i, "".into());
+        sg.server_health.insert(i, HealthChecker::new(i, "".into()));
+    }
+    
+    for i in 5..10
+    {
+        sg.server_addrs.insert(i, "".into());
+
+        let mut hc =  HealthChecker::new(i, "".into());
+
+        hc.upstream_state = UpstreamState::UNHEALTHY;
+
+        sg.server_health.insert(i, hc);
+    }
+
+    let mut cnt : usize = 0;
+    for i in 0..10
+    {
+        if let Some(id) = sg.find_min_and_healthy()
+        {
+            cnt += 1;
+
+            sg.add_connection(&id);
+        }
+
+    }
+
+    assert!(cnt == 10);
+
+    for i in 0..5
+    {
+        if let Some(cnt) = sg.cxn_cntr.get(&i)
+        {
+            assert!(cnt == &2);
+        }
+        else
+        {
+            // ID should be there
+            assert!(false);
+        }
+    }
+    
+    for i in 5..10
+    {
+        if let Some(cnt) = sg.cxn_cntr.get(&i)
+        {
+            assert!(false);
+        }
+        else
+        {
+            assert!(true);
+        }
     }
 }
 

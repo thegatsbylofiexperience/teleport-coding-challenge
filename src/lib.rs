@@ -31,6 +31,19 @@ impl LoadBalancer
 
     pub fn poll(&mut self) -> Result<(), Box<dyn std::error::Error>>
     {
+        self.handle_listener()?;
+
+        self.handle_clients()?;
+
+        self.handle_server_groups()?;
+
+        self.handle_partial_connections();
+
+        Ok(())
+    }
+
+    fn handle_listener(&mut self) -> Result<(), Box<dyn std::error::Error>>
+    {
         for stream_res in self.listener.incoming()
         {
 			match stream_res
@@ -62,16 +75,40 @@ impl LoadBalancer
 			}
         }
 
+        Ok(())
+    }
+
+    fn handle_clients(&mut self) -> Result<(), Box<dyn std::error::Error>>
+    {
         for (k,v) in self.clients.iter_mut()
         {
             v.poll()?;
+
+            for v in v.cleanup_connections().iter()
+            {
+                // remove from connection stats
+                if let Some(server_group) = self.server_groups.get_mut(&v.upstream_serv_group)
+                {
+                    server_group.remove_connection(&v.upstream_serv_id);
+                }
+            }
         }
 
+        Ok(())
+    }
+
+    fn handle_server_groups(&mut self) -> Result<(), Box<dyn std::error::Error>>
+    {
         for (k, v) in self.server_groups.iter_mut()
         {
             v.poll()?;
         }
 
+        Ok(())
+    }
+
+    fn handle_partial_connections(&mut self)
+    {
         let mut to_remove : Vec<usize> = vec![];
         let mut to_complete : Vec<usize> = vec![];
 
@@ -98,7 +135,8 @@ impl LoadBalancer
             self.partial_conns.remove(*i);
         }
 
-        // Remove from Vec in reverse order to keep index ordering
+        // Remove from Vec in reverse order
+        // to keep index ordering intact
         for i in to_complete.iter().rev()
         {
             let par_cxn = self.partial_conns.remove(*i);
@@ -107,7 +145,7 @@ impl LoadBalancer
             {
                 if let Some(client) = self.clients.get(&id)
                 {
-                    if let Some(server_group) = self.server_groups.get(&client.allowed_server_group)
+                    if let Some(server_group) = self.server_groups.get_mut(&client.allowed_server_group)
                     {
                         // get least connected and healthy upstream
                         if let Some(server_id) = server_group.find_min_and_healthy()
@@ -119,12 +157,14 @@ impl LoadBalancer
                                 {
                                     Ok(conn) =>
                                     {
+                                        // Add server connection to server stats
+                                        server_group.add_connection(&server_id);
                                         // add to client connections list
                                         self.insert_connection(&id, conn);
                                     },
                                     Err(e) =>
                                     {
-                                        //TODO: handle errors
+                                        //TODO: Log errors
                                     }
                                 }
                             }
@@ -133,8 +173,6 @@ impl LoadBalancer
                 }
             }
         }
-
-        Ok(())
     }
 
     fn insert_connection(&mut self, client_id: &String, cxn: Connection)
@@ -174,17 +212,12 @@ impl Client
             cxn.poll()?;
         }
 
-        // cleanup connections 
-        // TODO: Move to LoadBalancer -> addition and removeal of connections
-        self.cleanup_connections();
-
         Ok(())
     }
 
-    //TODO: LOGGING
     fn cleanup_connections(&mut self) -> Vec<Connection>
     {
-        let mut to_delete : Vec<usize> = vec![];
+        let mut to_remove : Vec<usize> = vec![];
 
         for (i, cxn) in self.connections.iter().enumerate()
         {
@@ -196,7 +229,7 @@ impl Client
                 ConnState::DOWN_TIMEOUT     |
                 ConnState::DOWN_ENC_ERR     =>
                 {
-                    to_delete.push(i);
+                    to_remove.push(i);
                 }
                 _ => {}
             }
@@ -204,7 +237,7 @@ impl Client
 
         let mut out : Vec<Connection> = vec![];
 
-        for i in to_delete.iter()
+        for i in to_remove.iter().rev()
         {
             out.push(self.connections.remove(*i));
         }
@@ -212,6 +245,50 @@ impl Client
         out
     }
 }
+
+#[test]
+fn test_client_cleanup()
+{
+    let addr: String = "127.0.0.1:25014".into();
+
+    // Minimum code to get connections working
+    // they are not needed apart from 
+    let listener = std::net::TcpListener::bind(addr.clone()).unwrap();
+    listener.set_nonblocking(true).unwrap();
+
+
+    let mut cli = Client::new("".to_string(), 0);
+    
+    for i in 0..8
+    {
+        let mut down_stream = TcpStream::connect(addr.clone()).unwrap();
+        let mut up_stream = TcpStream::connect(addr.clone()).unwrap();
+
+        let mut cxn = Connection::new(down_stream, up_stream, 0, 0).unwrap();
+
+        match i
+        {
+            0 => { cxn.conn_state = ConnState::INIT; },
+            1 => { cxn.conn_state = ConnState::UP_CONNECTED; },
+            2 => { cxn.conn_state = ConnState::OKAY; },
+            3 => { cxn.conn_state = ConnState::UP_DISCONNECT; },
+            4 => { cxn.conn_state = ConnState::UP_TIMEOUT; },
+            5 => { cxn.conn_state = ConnState::DOWN_DISCONNECT; },
+            6 => { cxn.conn_state = ConnState::DOWN_TIMEOUT; },
+            7 => { cxn.conn_state = ConnState::DOWN_ENC_ERR; }
+            _ => {},
+        }
+
+        cli.connections.push(cxn);
+    }
+
+    let bad_connections = cli.cleanup_connections();
+
+    assert!(bad_connections.len() == 5);
+    assert!(cli.connections.len() == 3);
+}
+
+
 
 #[derive(Clone, PartialEq, Eq)]
 enum PartialConnState
@@ -409,7 +486,7 @@ impl Connection
                 // To destroy this instance.
             }
         }
-
+        println!("CXN NS: {:?} CurrState: {:?}", next_state, self.conn_state);
         self.conn_state = next_state;
 
         Ok(())
@@ -422,26 +499,34 @@ fn test_connection_both_connected_data_transfer()
     let lb_addr: String = "127.0.0.1:25006".into();
     let us_addr: String = "127.0.0.1:25007".into();
 
+    // loadbalancer server listner
     let lb_listener = std::net::TcpListener::bind(lb_addr.clone()).unwrap();
     lb_listener.set_nonblocking(true).unwrap();
 
+    // upstream server listner
     let us_listener = std::net::TcpListener::bind(us_addr.clone()).unwrap();
     us_listener.set_nonblocking(true).unwrap();
 
     let point_one_milli = Duration::from_micros(100);
+
+    // Client cxn to load balancer
     let mut client = TcpStream::connect(lb_addr).unwrap();
     client.set_read_timeout(Some(point_one_milli.clone())).unwrap();
     client.set_write_timeout(Some(point_one_milli.clone())).unwrap();
     client.set_nonblocking(true).unwrap();
     client.set_nodelay(true).unwrap();
 
+    // load balancer cxn to load upstream
     let mut up_stream = TcpStream::connect(us_addr).unwrap();
     up_stream.set_read_timeout(Some(point_one_milli.clone())).unwrap();
     up_stream.set_write_timeout(Some(point_one_milli.clone())).unwrap();
     up_stream.set_nonblocking(true).unwrap();
     up_stream.set_nodelay(true).unwrap();
 
+    // client cxn inside the loadbalancer
     let mut down_stream : Option<std::net::TcpStream> = None;
+ 
+    // upstream cxn to loadbalancer
     let mut up_server_stream : Option<std::net::TcpStream> = None;
 
     loop
@@ -654,17 +739,33 @@ fn test_connection_both_connected_client_drops()
 
     let mut cxn = Connection::new(down_stream.unwrap(), up_stream, 0, 0).unwrap(); 
 
+    client.as_ref().unwrap().write_all("HELLO".as_bytes());
+    up_server_stream.as_ref().unwrap().write_all("GOODBYE".as_bytes()).unwrap();
 
     cxn.poll().unwrap();
 
     client = None;
+    
+    let mut buf : [u8; 8] = [0; 8];
+    match up_server_stream.as_ref().unwrap().read(&mut buf)
+    {
+        Ok(n) =>
+        {
+            assert!(buf[0..n] == *"HELLO".as_bytes());
+        },
+        Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock =>
+        {
+            // wait for next poll
+            assert!(false);
+        },
+        Err(e) =>
+        {
+            assert!(false);
+        }
+    }
 
     cxn.poll().unwrap();
-    cxn.poll().unwrap();
-    cxn.poll().unwrap();
 
-    //TODO: HMMMMMM
-    //This fails right now.
     println!("{:?}", cxn.conn_state);
     assert!(cxn.conn_state == ConnState::DOWN_DISCONNECT);
 }
@@ -766,23 +867,103 @@ fn test_connection_both_connected_upstream_drops()
 
     let mut cxn = Connection::new(down_stream.unwrap(), up_stream, 0, 0).unwrap(); 
 
+    client.write_all("HELLO".as_bytes());
+    up_server_stream.as_ref().unwrap().write_all("GOODBYE".as_bytes()).unwrap();
 
     cxn.poll().unwrap();
 
     up_server_stream = None;
 
-    cxn.poll().unwrap();
-    cxn.poll().unwrap();
+    let mut buf : [u8; 8] = [0; 8];
+    match client.read(&mut buf)
+    {
+        Ok(n) =>
+        {
+            assert!(buf[0..n] == *"GOODBYE".as_bytes());
+        },
+        Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock =>
+        {
+            // wait for next poll
+            assert!(false);
+        },
+        Err(e) =>
+        {
+            assert!(false);
+        }
+    }
+
     cxn.poll().unwrap();
 
     println!("{:?}", cxn.conn_state);
-    assert!(cxn.conn_state == ConnState::DOWN_DISCONNECT);
+    assert!(cxn.conn_state == ConnState::UP_DISCONNECT);
 }
 
 #[test]
 fn test_connection_client_connected_upstream_down()
 {
-    //TODO!
+    let lb_addr: String = "127.0.0.1:25012".into();
+    let us_addr: String = "127.0.0.1:25013".into();
+
+    let lb_listener = std::net::TcpListener::bind(lb_addr.clone()).unwrap();
+    lb_listener.set_nonblocking(true).unwrap();
+    
+    let point_one_milli = Duration::from_micros(100);
+    let mut client = TcpStream::connect(lb_addr).unwrap();
+    client.set_read_timeout(Some(point_one_milli.clone())).unwrap();
+    client.set_write_timeout(Some(point_one_milli.clone())).unwrap();
+    client.set_nonblocking(true).unwrap();
+    client.set_nodelay(true).unwrap();
+    
+    let mut down_stream : Option<std::net::TcpStream> = None;
+    loop
+    {
+        let mut should_break = false;
+
+        for stream_res in lb_listener.incoming()
+        {
+		    match stream_res
+		    {
+		        Ok(strm) =>
+			    {
+                    strm.set_read_timeout(Some(point_one_milli.clone())).unwrap();
+                    strm.set_write_timeout(Some(point_one_milli.clone())).unwrap();
+                    strm.set_nonblocking(true).unwrap();
+                    strm.set_nodelay(true).unwrap();
+                    down_stream = Some(strm);
+                    should_break = true;
+                },
+    		    Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock =>
+    		    { 
+				    break;
+    		    },
+    		    Err(e) =>
+    		    {
+                    assert!(false);
+			    }
+            }
+        }
+        if should_break
+        {
+            break;
+        }
+    }
+
+    let mut par_cxn = PartialConnection::new(down_stream.unwrap());
+
+    // Set to  
+    par_cxn.poll();
+
+    match Connection::from_partial_connection(par_cxn, 0, 0, &us_addr)
+    {
+        Ok(cxn) => 
+        {
+            assert!(false);
+        },
+        Err(e) =>
+        {
+            assert!(true);
+        }
+    }
 }
 
 // TODO: Server health should be put in a thread
@@ -1189,6 +1370,7 @@ impl HealthChecker
         {
             PingState::IDLE(idle_ts) =>
             {
+                println!("{} {}",  idle_ts / 30,  now / 30);
                 if idle_ts / 30 != now / 30
                 {
                     // Connect

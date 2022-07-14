@@ -1,0 +1,58 @@
+Certificate:
+    Data:
+        Version: 3 (0x2)
+        Serial Number: 3 (0x3)
+        Signature Algorithm: ecdsa-with-SHA256
+        Issuer: C=AU, ST=VIC, L=Melbourne, O=AwesomeCo, CN=ca
+        Validity
+            Not Before: Jul 14 15:26:27 2022 GMT
+            Not After : Jul 14 15:26:27 2023 GMT
+        Subject: C=AU, ST=VIC, O=AwesomeCo, OU=second, CN=second/emailAddress=second@second.com
+        Subject Public Key Info:
+            Public Key Algorithm: id-ecPublicKey
+                Public-Key: (256 bit)
+                pub:
+                    04:03:6c:a9:52:bb:09:6a:85:a4:47:60:a9:c9:65:
+                    2e:a2:dd:80:a8:8c:7c:00:bd:71:75:ab:11:88:aa:
+                    0f:9c:43:e2:87:86:85:9c:45:54:93:1b:ba:1b:58:
+                    9b:1d:d4:d0:af:33:17:41:be:49:ac:b5:45:d9:42:
+                    a2:5f:3d:f8:de
+                ASN1 OID: prime256v1
+                NIST CURVE: P-256
+        X509v3 extensions:
+            X509v3 Basic Constraints: 
+                CA:FALSE
+            Netscape Cert Type: 
+                SSL Client, S/MIME
+            Netscape Comment: 
+                OpenSSL Generated Client Certificate
+            X509v3 Subject Key Identifier: 
+                9C:C5:83:58:24:CA:67:DE:B1:D8:9D:D7:FD:31:E5:4E:10:46:90:D4
+            X509v3 Authority Key Identifier: 
+                keyid:0E:A5:94:1C:5F:CB:3C:25:E9:37:61:AD:4F:DA:38:EB:E3:42:85:4E
+
+            X509v3 Key Usage: critical
+                Digital Signature, Non Repudiation, Key Encipherment
+            X509v3 Extended Key Usage: 
+                TLS Web Client Authentication, E-mail Protection
+    Signature Algorithm: ecdsa-with-SHA256
+         30:45:02:20:25:fa:73:82:af:11:2e:d5:eb:d5:16:c3:b8:7a:
+         a6:4b:b8:44:d2:0b:d8:f0:96:d2:72:be:0c:46:04:63:24:5a:
+         02:21:00:df:0f:7e:37:e7:ce:23:51:33:00:2e:b3:07:51:4d:
+         7a:85:49:65:cd:a5:eb:08:62:9f:04:a2:99:5b:36:73:92
+-----BEGIN CERTIFICATE-----
+MIICeDCCAh6gAwIBAgIBAzAKBggqhkjOPQQDAjBQMQswCQYDVQQGEwJBVTEMMAoG
+A1UECAwDVklDMRIwEAYDVQQHDAlNZWxib3VybmUxEjAQBgNVBAoMCUF3ZXNvbWVD
+bzELMAkGA1UEAwwCY2EwHhcNMjIwNzE0MTUyNjI3WhcNMjMwNzE0MTUyNjI3WjBz
+MQswCQYDVQQGEwJBVTEMMAoGA1UECAwDVklDMRIwEAYDVQQKDAlBd2Vzb21lQ28x
+DzANBgNVBAsMBnNlY29uZDEPMA0GA1UEAwwGc2Vjb25kMSAwHgYJKoZIhvcNAQkB
+FhFzZWNvbmRAc2Vjb25kLmNvbTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABANs
+qVK7CWqFpEdgqcllLqLdgKiMfAC9cXWrEYiqD5xD4oeGhZxFVJMbuhtYmx3U0K8z
+F0G+Say1RdlCol89+N6jgcUwgcIwCQYDVR0TBAIwADARBglghkgBhvhCAQEEBAMC
+BaAwMwYJYIZIAYb4QgENBCYWJE9wZW5TU0wgR2VuZXJhdGVkIENsaWVudCBDZXJ0
+aWZpY2F0ZTAdBgNVHQ4EFgQUnMWDWCTKZ96x2J3X/THlThBGkNQwHwYDVR0jBBgw
+FoAUDqWUHF/LPCXpN2GtT9o46+NChU4wDgYDVR0PAQH/BAQDAgXgMB0GA1UdJQQW
+MBQGCCsGAQUFBwMCBggrBgEFBQcDBDAKBggqhkjOPQQDAgNIADBFAiAl+nOCrxEu
+1evVFsO4eqZLuETSC9jwltJyvgxGBGMkWgIhAN8PfjfnziNRMwAuswdRTXqFSWXN
+pesIYp8EoplbNnOS
+-----END CERTIFICATE-----

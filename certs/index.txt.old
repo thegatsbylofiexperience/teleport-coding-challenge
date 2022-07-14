@@ -1,0 +1,4 @@
+V	230714152431Z		01	unknown	/C=AU/ST=VIC/O=AwesomeCo/CN=localhost
+V	230714152533Z		02	unknown	/C=AU/ST=VIC/O=AwesomeCo/CN=first/emailAddress=first@first.com
+V	230714152627Z		03	unknown	/C=AU/ST=VIC/O=AwesomeCo/OU=second/CN=second/emailAddress=second@second.com
+V	230714152724Z		04	unknown	/C=AU/ST=VIC/O=AwesomeCo/CN=third/emailAddress=third@third.com

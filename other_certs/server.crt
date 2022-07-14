@@ -1,0 +1,64 @@
+Certificate:
+    Data:
+        Version: 3 (0x2)
+        Serial Number: 1 (0x1)
+        Signature Algorithm: ecdsa-with-SHA256
+        Issuer: C=AU, ST=VIC, L=Melbourne, O=NotAwesomeCo, CN=ca
+        Validity
+            Not Before: Jul 14 15:34:48 2022 GMT
+            Not After : Jul 14 15:34:48 2023 GMT
+        Subject: C=AU, ST=VIC, O=NotAwesomeCo, CN=localhost
+        Subject Public Key Info:
+            Public Key Algorithm: id-ecPublicKey
+                Public-Key: (256 bit)
+                pub:
+                    04:62:5e:8e:25:ca:8b:5c:66:74:05:1c:54:00:58:
+                    2f:f4:dd:2f:bc:ab:0c:9a:79:df:7e:37:54:66:93:
+                    4a:0c:2e:79:15:6e:69:c1:c5:e3:22:40:8b:df:d3:
+                    25:1d:77:5c:c8:63:44:4f:b9:e8:d6:6c:3d:49:2b:
+                    a2:ba:da:ef:d3
+                ASN1 OID: prime256v1
+                NIST CURVE: P-256
+        X509v3 extensions:
+            X509v3 Basic Constraints: 
+                CA:FALSE
+            Netscape Cert Type: 
+                SSL Server
+            Netscape Comment: 
+                OpenSSL Generated Server Certificate
+            X509v3 Subject Key Identifier: 
+                0E:29:49:BB:00:D5:5F:C2:1A:78:9E:14:C5:22:60:D2:E2:34:21:C9
+            X509v3 Authority Key Identifier: 
+                keyid:7D:09:68:8C:62:45:55:09:F1:5D:49:D4:E5:86:4A:92:77:CB:CD:DD
+                DirName:/C=AU/ST=VIC/L=Melbourne/O=NotAwesomeCo/CN=ca
+                serial:11:E9:05:CD:14:7F:49:E2:9A:5F:96:D6:4F:A5:AC:2B:C4:11:F8
+
+            X509v3 Key Usage: critical
+                Digital Signature, Key Encipherment
+            X509v3 Extended Key Usage: 
+                TLS Web Server Authentication
+            X509v3 Subject Alternative Name: 
+                IP Address:127.0.0.1, DNS:localhost
+    Signature Algorithm: ecdsa-with-SHA256
+         30:45:02:21:00:e0:1a:e7:08:ca:aa:1c:66:d2:78:59:b0:6a:
+         d0:6f:d9:ea:1f:b4:41:b5:91:68:5f:1b:c9:86:a6:35:d6:5d:
+         e1:02:20:35:5f:5a:c5:d2:46:51:77:15:37:53:a6:12:fc:5c:
+         0a:11:a6:08:b1:fc:9c:9a:f4:6a:b5:b4:e6:f1:19:42:b8
+-----BEGIN CERTIFICATE-----
+MIIC0zCCAnmgAwIBAgIBATAKBggqhkjOPQQDAjBTMQswCQYDVQQGEwJBVTEMMAoG
+A1UECAwDVklDMRIwEAYDVQQHDAlNZWxib3VybmUxFTATBgNVBAoMDE5vdEF3ZXNv
+bWVDbzELMAkGA1UEAwwCY2EwHhcNMjIwNzE0MTUzNDQ4WhcNMjMwNzE0MTUzNDQ4
+WjBGMQswCQYDVQQGEwJBVTEMMAoGA1UECAwDVklDMRUwEwYDVQQKDAxOb3RBd2Vz
+b21lQ28xEjAQBgNVBAMMCWxvY2FsaG9zdDBZMBMGByqGSM49AgEGCCqGSM49AwEH
+A0IABGJejiXKi1xmdAUcVABYL/TdL7yrDJp53343VGaTSgwueRVuacHF4yJAi9/T
+JR13XMhjRE+56NZsPUkrorra79OjggFJMIIBRTAJBgNVHRMEAjAAMBEGCWCGSAGG
++EIBAQQEAwIGQDAzBglghkgBhvhCAQ0EJhYkT3BlblNTTCBHZW5lcmF0ZWQgU2Vy
+dmVyIENlcnRpZmljYXRlMB0GA1UdDgQWBBQOKUm7ANVfwhp4nhTFImDS4jQhyTCB
+jwYDVR0jBIGHMIGEgBR9CWiMYkVVCfFdSdTlhkqSd8vN3aFXpFUwUzELMAkGA1UE
+BhMCQVUxDDAKBgNVBAgMA1ZJQzESMBAGA1UEBwwJTWVsYm91cm5lMRUwEwYDVQQK
+DAxOb3RBd2Vzb21lQ28xCzAJBgNVBAMMAmNhghMR6QXNFH9J4ppfltZPpawrxBH4
+MA4GA1UdDwEB/wQEAwIFoDATBgNVHSUEDDAKBggrBgEFBQcDATAaBgNVHREEEzAR
+hwR/AAABgglsb2NhbGhvc3QwCgYIKoZIzj0EAwIDSAAwRQIhAOAa5wjKqhxm0nhZ
+sGrQb9nqH7RBtZFoXxvJhqY11l3hAiA1X1rF0kZRdxU3U6YS/FwKEaYIsfycmvRq
+tbTm8RlCuA==
+-----END CERTIFICATE-----

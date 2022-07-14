@@ -153,6 +153,37 @@ fn test_client_cleanup()
     assert!(cli.connections.len() == 3);
 }
 
+#[test]
+fn test_client_rate_limiter()
+{
+    let addr: String = "127.0.0.1:25015".into();
+
+    // Minimum code to get connections working
+    // they are not needed apart from 
+    let listener = std::net::TcpListener::bind(addr.clone()).unwrap();
+    listener.set_nonblocking(true).unwrap();
+
+    let mut cli = Client::new("".to_string(), 0);
+
+
+	// TLS setup that is ot used other than for creation of Connection struct
+	let config = crate::config::create_server_tls_config(false).unwrap();
+
+    for i in 0..20
+    {
+        let down_stream = TcpStream::connect(addr.clone()).unwrap();
+        let up_stream = TcpStream::connect(addr.clone()).unwrap();
+		let tls_conn = rustls::ServerConnection::new(Arc::clone(&config)).unwrap();
+        
+
+        let cxn = Connection::new(down_stream, up_stream, tls_conn, 0, 0).unwrap();
+
+        cli.add_connection(cxn);
+    }
+
+	println!("{}", cli.connections.len());
+    assert!(cli.connections.len() == 10);
+}
 
 
 #[derive(Clone, PartialEq, Eq)]

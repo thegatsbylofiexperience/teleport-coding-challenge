@@ -163,58 +163,26 @@ impl PartialConnection
                 // Handle authentication / authorisation
                 if self.tls_conn.is_handshaking()
                 {
-				    if self.tls_conn.wants_read()
-                    {
-                        match self.tls_conn.read_tls(&mut self.down_stream)
-                        {
-                            Ok(n) =>
-                            {
-                                if n == 0
-                                {
-                                    next_state = PartialConnState::ERROR;
-                                }
-                                else
-                                {
-                                    if let Ok(_io_state) = self.tls_conn.process_new_packets()
-                                    {
-                                        // we are handshaking so we want to process the handshake packets 
-                                    }
-                                    else
-                                    {
-                                        next_state = PartialConnState::ERROR;
-                                    }
-                                }
-                            },
-                            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock =>
-                            {
-                                // wait for next poll
-                            },
-                            Err(_e) =>
-                            {
-                                next_state = PartialConnState::ERROR;
-                            }
-                        }
-                    }
+                    let mut tls_stream = rustls::Stream::new(&mut self.tls_conn, &mut self.down_stream);
 
-                    if self.tls_conn.wants_write()
+                    let mut buf : [u8; 2048] = [0; 2048];
+
+                    match tls_stream.read(&mut buf)
                     {
-                        match self.tls_conn.write_tls(&mut self.down_stream)
+                        Ok(n) =>
                         {
-                            Ok(n) =>
-                            {
-                                if n == 0
-                                {
-                                    next_state = PartialConnState::ERROR;
-                                }
-                            },
-                            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock =>
-                            {
-                                // wait for next poll
-                            },
-                            Err(_e) =>
+                            if n == 0
                             {
                                 next_state = PartialConnState::ERROR;
                             }
+                        },
+                        Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock =>
+                        {
+                            // wait for next poll
+                        },
+                        Err(_e) =>
+                        {
+                            next_state = PartialConnState::ERROR;
                         }
                     }
                 }
@@ -228,18 +196,23 @@ impl PartialConnection
                         {
                             Ok(email) =>
                             {
+                                info!("Email found: {email}");
+
                                 self.email_address = Some(email);
                                 next_state = PartialConnState::COMPLETED;
                             },
-                            Err(_e) =>
+                            Err(e) =>
                             {
                                 next_state = PartialConnState::ERROR;
+                                error!("Email address not found in client cert.");
+                                error!("{e}");
                             }
                         }
                     }
                     else
                     {
                         next_state = PartialConnState::ERROR;
+                        error!("Client certs not found.");
                     }
                 }
             },
@@ -269,14 +242,12 @@ impl PartialConnection
 fn extract_email_from_cert(cert: &Vec<u8>) -> Result<String, Box<dyn std::error::Error>>
 {
     let (rem, cert) = X509Certificate::from_der(&cert[..])?;
-    if let Some(email_ext) = cert.get_extension_unique(&oid_registry::OID_PKCS9_EMAIL_ADDRESS)?
+    for email in cert.subject().iter_email()
     {
-        return Ok(String::from_utf8(email_ext.value.to_vec())?);
+        return Ok(email.as_str()?.to_string());
     }
-    else
-    {
-        return Err("No email address found".into());
-    }
+
+	return Err("No email address found".into());
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -311,6 +282,10 @@ impl Connection
     {
         // TODO: Blocking call. Move to call with a timeout or wrap in a thread.
         let up_stream = std::net::TcpStream::connect(up_stream_addr)?;
+        up_stream.set_read_timeout(Some(Duration::from_millis(1)))?;
+        up_stream.set_write_timeout(Some(Duration::from_millis(1)))?;
+        up_stream.set_nonblocking(true)?;
+        up_stream.set_nodelay(true)?;
 
         Self::new(partial_cxn.down_stream, up_stream, partial_cxn.tls_conn, upstream_serv_group, upstream_serv_id)
     }
@@ -342,9 +317,12 @@ impl Connection
                 {
                     Ok(n) =>
                     {
+                        info!("Received: {n} bytes");
+
                         if n == 0
                         {
                             next_state = ConnState::DOWN_DISCONNECT;
+                            error!("Client DC");
                         }
                         else
                         {
@@ -359,9 +337,10 @@ impl Connection
                                 {
                                     // wait for next poll
                                 },
-                                Err(_e) =>
+                                Err(e) =>
                                 {
                                     next_state = ConnState::UP_DISCONNECT;
+                                    error!("UPSTREAM DC: {e}");
                                 }
                             }
                         }
@@ -370,9 +349,10 @@ impl Connection
                     {
                         // wait for next poll
                     },
-                    Err(_e) =>
+                    Err(e) =>
                     {
                         next_state = ConnState::DOWN_DISCONNECT;
+                        error!("Client DC: {e}");
                     }
                 }
 
@@ -384,6 +364,7 @@ impl Connection
                         if n == 0
                         {
                             next_state = ConnState::UP_DISCONNECT;
+                            error!("UPSTREAM DC");
                         }
                         else
                         {
@@ -394,7 +375,8 @@ impl Connection
                                 {
                                     if n == 0
                                     {
-                                        next_state = ConnState::UP_DISCONNECT;
+                                        next_state = ConnState::DOWN_DISCONNECT;
+                                        error!("Client DC");
                                     }
 
                                     // otherwise Great!
@@ -403,9 +385,10 @@ impl Connection
                                 {
                                     // wait for next poll
                                 },
-                                Err(_e) =>
+                                Err(e) =>
                                 {
                                     next_state = ConnState::DOWN_DISCONNECT;
+                                    error!("Client DC: {e}");
                                 }
                             }
                         }
@@ -414,9 +397,10 @@ impl Connection
                     {
                         // wait for next poll
                     },
-                    Err(_e) =>
+                    Err(e) =>
                     {
                         next_state = ConnState::UP_DISCONNECT;
+                        error!("UPSTREAM DC: {e}");
                     }
                 }
             },
@@ -428,7 +412,7 @@ impl Connection
                 // To destroy this instance.
             }
         }
-        println!("CXN NS: {:?} CurrState: {:?}", next_state, self.conn_state);
+
         self.conn_state = next_state;
 
         Ok(())
@@ -449,19 +433,17 @@ fn test_connection_both_connected_data_transfer()
     let us_listener = std::net::TcpListener::bind(us_addr.clone()).unwrap();
     us_listener.set_nonblocking(true).unwrap();
 
-    let point_one_milli = Duration::from_micros(100);
-
     // Client cxn to load balancer
     let mut client = TcpStream::connect(lb_addr).unwrap();
-    client.set_read_timeout(Some(point_one_milli.clone())).unwrap();
-    client.set_write_timeout(Some(point_one_milli.clone())).unwrap();
+    client.set_read_timeout(Some(Duration::from_millis(1))).unwrap();
+    client.set_write_timeout(Some(Duration::from_millis(1))).unwrap();
     client.set_nonblocking(true).unwrap();
     client.set_nodelay(true).unwrap();
 
     // load balancer cxn to load upstream
     let mut up_stream = TcpStream::connect(us_addr).unwrap();
-    up_stream.set_read_timeout(Some(point_one_milli.clone())).unwrap();
-    up_stream.set_write_timeout(Some(point_one_milli.clone())).unwrap();
+    up_stream.set_read_timeout(Some(Duration::from_millis(1))).unwrap();
+    up_stream.set_write_timeout(Some(Duration::from_millis(1))).unwrap();
     up_stream.set_nonblocking(true).unwrap();
     up_stream.set_nodelay(true).unwrap();
 
@@ -481,8 +463,8 @@ fn test_connection_both_connected_data_transfer()
 		    {
 		        Ok(strm) =>
 			    {
-                    strm.set_read_timeout(Some(point_one_milli.clone())).unwrap();
-                    strm.set_write_timeout(Some(point_one_milli.clone())).unwrap();
+                    strm.set_read_timeout(Some(Duration::from_millis(1))).unwrap();
+                    strm.set_write_timeout(Some(Duration::from_millis(1))).unwrap();
                     strm.set_nonblocking(true).unwrap();
                     strm.set_nodelay(true).unwrap();
                     down_stream = Some(strm);
@@ -514,8 +496,8 @@ fn test_connection_both_connected_data_transfer()
 		    {
 		        Ok(strm) =>
 			    {
-                    strm.set_read_timeout(Some(point_one_milli.clone())).unwrap();
-                    strm.set_write_timeout(Some(point_one_milli.clone())).unwrap();
+                    strm.set_read_timeout(Some(Duration::from_millis(1))).unwrap();
+                    strm.set_write_timeout(Some(Duration::from_millis(1))).unwrap();
                     strm.set_nonblocking(true).unwrap();
                     strm.set_nodelay(true).unwrap();
                     up_server_stream = Some(strm);
@@ -596,16 +578,16 @@ fn test_connection_both_connected_client_drops()
     let us_listener = std::net::TcpListener::bind(us_addr.clone()).unwrap();
     us_listener.set_nonblocking(true).unwrap();
 
-    let point_one_milli = Duration::from_micros(100);
+    let one_milli = Duration::from_millis(1);
     let mut client : Option<TcpStream> = Some(TcpStream::connect(lb_addr).unwrap());
-    client.as_ref().unwrap().set_read_timeout(Some(point_one_milli.clone())).unwrap();
-    client.as_ref().unwrap().set_write_timeout(Some(point_one_milli.clone())).unwrap();
+    client.as_ref().unwrap().set_read_timeout(Some(one_milli.clone())).unwrap();
+    client.as_ref().unwrap().set_write_timeout(Some(one_milli.clone())).unwrap();
     client.as_ref().unwrap().set_nonblocking(true).unwrap();
     client.as_ref().unwrap().set_nodelay(true).unwrap();
 
     let mut up_stream = TcpStream::connect(us_addr).unwrap();
-    up_stream.set_read_timeout(Some(point_one_milli.clone())).unwrap();
-    up_stream.set_write_timeout(Some(point_one_milli.clone())).unwrap();
+    up_stream.set_read_timeout(Some(one_milli.clone())).unwrap();
+    up_stream.set_write_timeout(Some(one_milli.clone())).unwrap();
     up_stream.set_nonblocking(true).unwrap();
     up_stream.set_nodelay(true).unwrap();
 
@@ -622,8 +604,8 @@ fn test_connection_both_connected_client_drops()
 		    {
 		        Ok(strm) =>
 			    {
-                    strm.set_read_timeout(Some(point_one_milli.clone())).unwrap();
-                    strm.set_write_timeout(Some(point_one_milli.clone())).unwrap();
+                    strm.set_read_timeout(Some(one_milli.clone())).unwrap();
+                    strm.set_write_timeout(Some(one_milli.clone())).unwrap();
                     strm.set_nonblocking(true).unwrap();
                     strm.set_nodelay(true).unwrap();
                     down_stream = Some(strm);
@@ -655,8 +637,8 @@ fn test_connection_both_connected_client_drops()
 		    {
 		        Ok(strm) =>
 			    {
-                    strm.set_read_timeout(Some(point_one_milli.clone())).unwrap();
-                    strm.set_write_timeout(Some(point_one_milli.clone())).unwrap();
+                    strm.set_read_timeout(Some(one_milli.clone())).unwrap();
+                    strm.set_write_timeout(Some(one_milli.clone())).unwrap();
                     strm.set_nonblocking(true).unwrap();
                     strm.set_nodelay(true).unwrap();
                     up_server_stream = Some(strm);
@@ -724,16 +706,16 @@ fn test_connection_both_connected_upstream_drops()
     let us_listener = std::net::TcpListener::bind(us_addr.clone()).unwrap();
     us_listener.set_nonblocking(true).unwrap();
 
-    let point_one_milli = Duration::from_micros(100);
+    let one_milli = Duration::from_millis(1);
     let mut client = TcpStream::connect(lb_addr).unwrap();
-    client.set_read_timeout(Some(point_one_milli.clone())).unwrap();
-    client.set_write_timeout(Some(point_one_milli.clone())).unwrap();
+    client.set_read_timeout(Some(one_milli.clone())).unwrap();
+    client.set_write_timeout(Some(one_milli.clone())).unwrap();
     client.set_nonblocking(true).unwrap();
     client.set_nodelay(true).unwrap();
 
     let mut up_stream = TcpStream::connect(us_addr).unwrap();
-    up_stream.set_read_timeout(Some(point_one_milli.clone())).unwrap();
-    up_stream.set_write_timeout(Some(point_one_milli.clone())).unwrap();
+    up_stream.set_read_timeout(Some(one_milli.clone())).unwrap();
+    up_stream.set_write_timeout(Some(one_milli.clone())).unwrap();
     up_stream.set_nonblocking(true).unwrap();
     up_stream.set_nodelay(true).unwrap();
 
@@ -750,8 +732,8 @@ fn test_connection_both_connected_upstream_drops()
 		    {
 		        Ok(strm) =>
 			    {
-                    strm.set_read_timeout(Some(point_one_milli.clone())).unwrap();
-                    strm.set_write_timeout(Some(point_one_milli.clone())).unwrap();
+                    strm.set_read_timeout(Some(one_milli.clone())).unwrap();
+                    strm.set_write_timeout(Some(one_milli.clone())).unwrap();
                     strm.set_nonblocking(true).unwrap();
                     strm.set_nodelay(true).unwrap();
                     down_stream = Some(strm);
@@ -783,8 +765,8 @@ fn test_connection_both_connected_upstream_drops()
 		    {
 		        Ok(strm) =>
 			    {
-                    strm.set_read_timeout(Some(point_one_milli.clone())).unwrap();
-                    strm.set_write_timeout(Some(point_one_milli.clone())).unwrap();
+                    strm.set_read_timeout(Some(one_milli.clone())).unwrap();
+                    strm.set_write_timeout(Some(one_milli.clone())).unwrap();
                     strm.set_nonblocking(true).unwrap();
                     strm.set_nodelay(true).unwrap();
                     up_server_stream = Some(strm);
@@ -849,10 +831,10 @@ fn test_connection_client_connected_upstream_down()
     let lb_listener = std::net::TcpListener::bind(lb_addr.clone()).unwrap();
     lb_listener.set_nonblocking(true).unwrap();
     
-    let point_one_milli = Duration::from_micros(100);
+    let one_milli = Duration::from_millis(1);
     let mut client = TcpStream::connect(lb_addr).unwrap();
-    client.set_read_timeout(Some(point_one_milli.clone())).unwrap();
-    client.set_write_timeout(Some(point_one_milli.clone())).unwrap();
+    client.set_read_timeout(Some(one_milli.clone())).unwrap();
+    client.set_write_timeout(Some(one_milli.clone())).unwrap();
     client.set_nonblocking(true).unwrap();
     client.set_nodelay(true).unwrap();
     
@@ -867,8 +849,8 @@ fn test_connection_client_connected_upstream_down()
 		    {
 		        Ok(strm) =>
 			    {
-                    strm.set_read_timeout(Some(point_one_milli.clone())).unwrap();
-                    strm.set_write_timeout(Some(point_one_milli.clone())).unwrap();
+                    strm.set_read_timeout(Some(one_milli.clone())).unwrap();
+                    strm.set_write_timeout(Some(one_milli.clone())).unwrap();
                     strm.set_nonblocking(true).unwrap();
                     strm.set_nodelay(true).unwrap();
                     down_stream = Some(strm);

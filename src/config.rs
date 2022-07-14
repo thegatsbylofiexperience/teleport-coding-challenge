@@ -39,7 +39,7 @@ fn load_private_key(filename: &str) -> Result<rustls::PrivateKey, Box<dyn std::e
 
 fn create_server_tls_config() -> Result<Arc<rustls::ServerConfig>, Box<dyn std::error::Error>>
 {
-    let roots = load_certs("cert/ec-cacert.pem".into())?;
+    let roots = load_certs("certs/cert/ec-cacert.pem".into())?;
     let mut client_auth_roots = RootCertStore::empty();
     for root in roots
     {
@@ -55,9 +55,9 @@ fn create_server_tls_config() -> Result<Arc<rustls::ServerConfig>, Box<dyn std::
 
     let versions : Vec<&'static rustls::SupportedProtocolVersion> = vec![&rustls::version::TLS13];
 
-    let certs = load_certs("server.pem")?;
+    let certs = load_certs("certs/server.pem")?;
 
-    let privkey = load_private_key("server.key")?;
+    let privkey = load_private_key("certs/server.key")?;
 
     let ocsp : Vec<u8> = vec![];
 
@@ -77,7 +77,7 @@ pub fn create_client_tls_config() -> Result<Arc<rustls::ClientConfig>, Box<dyn s
 {
     let mut root_store = RootCertStore::empty(); 
 
-    let certfile = std::fs::File::open(&"cert/ec-cacert.pem")?;
+    let certfile = std::fs::File::open(&"certs/cert/ec-cacert.pem")?;
     let mut reader = BufReader::new(certfile);
     root_store.add_parsable_certificates(&rustls_pemfile::certs(&mut reader)?);
 
@@ -94,8 +94,8 @@ pub fn create_client_tls_config() -> Result<Arc<rustls::ClientConfig>, Box<dyn s
                  .with_protocol_versions(&versions)?
                  .with_root_certificates(root_store);
 
-    let certs = load_certs("client.crt")?;
-    let key = load_private_key("client.key")?;
+    let certs = load_certs("certs/client.crt")?;
+    let key = load_private_key("certs/client.key")?;
 
     let mut conf = config.with_single_cert(certs, key)?;
 
@@ -125,11 +125,11 @@ pub fn load_configuration() -> Result<LoadBalancer, Box<dyn std::error::Error>>
     
     let mut sg1 = ServerGroup::new(1);
 
-    sg1.add_server(3, "127.0.0.1:2500".into());
-    sg1.add_server(4, "127.0.0.1:2501".into());
-    sg1.add_server(5, "127.0.0.1:2502".into());
+    sg1.add_server(3, "127.0.0.1:2503".into());
+    sg1.add_server(4, "127.0.0.1:2504".into());
+    sg1.add_server(5, "127.0.0.1:2505".into());
 
-    lb.server_groups.insert(0, sg1);
+    lb.server_groups.insert(1, sg1);
 
     return Ok(lb);
 }

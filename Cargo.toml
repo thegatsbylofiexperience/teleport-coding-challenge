@@ -11,4 +11,4 @@ rustls-pemfile  = "1.0"
 x509-parser     = "0.14"
 chrono          = "0.4"
 log             = "0.4"
-
+simple_logger   = "2"

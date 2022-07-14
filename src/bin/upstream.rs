@@ -1,7 +1,11 @@
+#![allow(unreachable_code, unused_imports)]
 
 use std::time::Duration;
 use std::io::Read;
 use std::io::Write;
+use log::{warn, info, error};
+use simple_logger::SimpleLogger;
+
 
 // Upstream Server
 // Just a straight TcpListener which listens for streams.
@@ -13,8 +17,12 @@ use std::io::Write;
 // For simplicity it is expected that all messages will fit within the buffer of 1024 bytes. This would not work in practise but for demonstration/testing this will suffice.
 fn main() -> Result<(), Box<dyn std::error::Error>>
 {
-    let ten_millis = std::time::Duration::from_millis(10);
-    let listener = std::net::TcpListener::bind("127.0.0.1:8443")?;
+    SimpleLogger::new().with_level(log::LevelFilter::Debug).init().unwrap();
+
+    info!("INIT Upstream!");
+
+    let listener = std::net::TcpListener::bind("127.0.0.1:2500")?;
+    info!("listening on 127.0.0.1:2500");
 
     listener.set_nonblocking(true)?;
 
@@ -28,9 +36,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
 			{
 				Ok(stream) =>
 				{
-                    let point_one_milli = Duration::from_micros(100);
-                    stream.set_read_timeout(Some(point_one_milli.clone()))?;
-                    stream.set_write_timeout(Some(point_one_milli.clone()))?;
+                    info!("Connection!");
+
+                    stream.set_read_timeout(Some(Duration::from_millis(1)))?;
+                    stream.set_write_timeout(Some(Duration::from_millis(1)))?;
                     stream.set_nonblocking(true)?;
                     stream.set_nodelay(true)?;
 
@@ -44,8 +53,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
     			},
     			Err(e) =>
     			{
-                    // TODO: Log Error
-					//return Err(e.into());
+                    error!("{e}");
 				}
 			}
         }
@@ -61,12 +69,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
                 {
                     if n == 4 && buf[0..n] == *"PING".as_bytes()
                     {
+                        info!("Received Ping");
                         // Send back "PONG"
                         match stream.write_all("PONG".as_bytes())
                         {
-                            Ok(n) =>
+                            Ok(()) =>
                             {
                                 // Great!
+                                info!("Sent Pong");
                             },
                             Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock =>
                             {
@@ -74,7 +84,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
                             },
                             Err(e) =>
                             {
-                                // TODO: Handle errors
+                                error!("{e}");
                                 to_remove.push(i);
                             }
                         }
@@ -84,7 +94,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
                         // write buffer back
                         match stream.write_all(&buf[0..n])
                         {
-                            Ok(n) =>
+                            Ok(()) =>
                             {
                                 // Great!
                             },
@@ -94,7 +104,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
                             },
                             Err(e) =>
                             {
-                                // TODO: Handle errors
+                                error!("{e}");
                                 to_remove.push(i);
                             }
                         }
@@ -106,9 +116,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
                 },
                 Err(e) =>
                 {
-                    // TODO: handle error types
-                    // TODO: log and remove stream
-
+                    error!("{e}");
                     to_remove.push(i);
                 }
             }
@@ -119,7 +127,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
             streams.remove(*i);
         }
 
-        std::thread::sleep(ten_millis);
+        std::thread::sleep(Duration::from_millis(10));
     }
 
     Ok(())

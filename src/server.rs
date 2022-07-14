@@ -438,9 +438,8 @@ impl HealthChecker
                     {
                         Ok(stream) =>
                         {
-                            let point_one_milli = Duration::from_micros(100);
-                            stream.set_read_timeout(Some(point_one_milli.clone()))?;
-                            stream.set_write_timeout(Some(point_one_milli.clone()))?;
+                            stream.set_read_timeout(Some(Duration::from_millis(1)))?;
+                            stream.set_write_timeout(Some(Duration::from_millis(1)))?;
                             stream.set_nonblocking(true)?;
                             stream.set_nodelay(true)?;
 
@@ -452,6 +451,7 @@ impl HealthChecker
                         {
                             self.upstream_state = UpstreamState::UNHEALTHY;
                             next_state = PingState::IDLE(now);
+                            error!("{} set to UNHEALTHY", self.server_id);
                         }
                     }
                 }
@@ -465,19 +465,26 @@ impl HealthChecker
                     // Send ping
                     match stream.write_all(&"PING".as_bytes())
                     {
-                        Ok(n) =>
+                        Ok(()) =>
                         {
-
+                            next_state = PingState::PING_SENT(now);
+                            info!("{} sent ping", self.server_id);
+                        },
+                        Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock=>
+                        {
+                            // wait for next poll
                         },
                         Err(e) =>
                         {
-                            // would block
-
-                            // others -> 
+                            // Connection is in error, as such, it is 
+                            // UNHEALTHY -> set it as such
+                            self.upstream_state = UpstreamState::UNHEALTHY;
+                            self.up_stream = None;
+                            next_state = PingState::IDLE(now);
+                            
+                            error!("{} set to UNHEALTHY", self.server_id);
                         }
                     }
-
-                    next_state = PingState::PING_SENT(now);
                 }
             },
             PingState::PING_SENT(timestamp) =>
@@ -489,6 +496,7 @@ impl HealthChecker
                     self.upstream_state = UpstreamState::UNHEALTHY;
                     self.up_stream = None;
                     next_state = PingState::IDLE(now);
+                    error!("{} set to UNHEALTHY", self.server_id);
                 }
                 else
                 {
@@ -509,10 +517,12 @@ impl HealthChecker
                                         // if pong not received within 1 second
                                         // mark unhealthy
                                         self.upstream_state = UpstreamState::UNHEALTHY;
+                                        error!("{} set to UNHEALTHY", self.server_id);
                                     }
                                     else
                                     {
                                         self.upstream_state = UpstreamState::HEALTHY;
+                                        info!("{} set to HEALTHY", self.server_id);
                                     }
                                 }
                                 
@@ -530,6 +540,8 @@ impl HealthChecker
                                 self.upstream_state = UpstreamState::UNHEALTHY;
                                 self.up_stream = None;
                                 next_state = PingState::IDLE(now);
+                                
+                                error!("{} set to UNHEALTHY", self.server_id);
                             }
                         }
                     }

@@ -34,7 +34,9 @@ impl LoadBalancer
     {
         let listener = TcpListener::bind("127.0.0.1:8443")?;
 
-        listener.set_nonblocking(true)?;
+		info!("Listening on 127.0.0.1:8443");
+        
+		listener.set_nonblocking(true)?;
 
         Ok(Self { clients : HashMap::new(), server_groups : HashMap::new(), partial_conns: vec![], listener, config })
     }
@@ -61,13 +63,12 @@ impl LoadBalancer
 				Ok(stream) =>
 				{
 					// Handle new stream
+                    info!("Client Connected!");
                     
-                    // Set values to ensure the stream is non-blocking
+					// Set values to ensure the stream is non-blocking
                     // and that data is sent immediately
-                    let point_one_milli = Duration::from_micros(100);
-
-                    stream.set_read_timeout(Some(point_one_milli.clone()))?;
-                    stream.set_write_timeout(Some(point_one_milli.clone()))?;
+                    stream.set_read_timeout(Some(Duration::from_millis(1)))?;
+                    stream.set_write_timeout(Some(Duration::from_millis(1)))?;
                     stream.set_nonblocking(true)?;
                     stream.set_nodelay(true)?;
 	
@@ -132,6 +133,8 @@ impl LoadBalancer
                 {
                     if v.is_completed()
                     {
+						info!("{} is complete and authed to client {:?}", i, v.client_id());
+
                         to_complete.push(i);
                     }
                 },
@@ -145,6 +148,7 @@ impl LoadBalancer
         for i in to_remove.iter().rev()
         {
             self.partial_conns.remove(*i);
+            info!("removing partial connection {}", i);
         }
 
         // Remove from Vec in reverse order
@@ -169,20 +173,42 @@ impl LoadBalancer
                                 {
                                     Ok(conn) =>
                                     {
+                                        info!("Full connection made: {id} {} {server_id} {upstream_addr}", client.get_server_group());
                                         // Add server connection to server stats
                                         server_group.add_connection(&server_id);
                                         // add to client connections list
                                         self.insert_connection(&id, conn);
                                     },
-                                    Err(_e) =>
+                                    Err(e) =>
                                     {
-                                        //TODO: Log errors
+                                        error!("Partial Connection conversion failed: {e}");
+                                        error!("id: {id} s_group: {} s_id: {server_id} addr: {upstream_addr}", client.get_server_group());
                                     }
                                 }
                             }
+                            else
+                            {
+                                error!("No server address found for server id {} in server group {} .. dropping", server_id, client.get_server_group());
+                            }
+                        }
+                        else
+                        {
+                            error!("No healthy server found in server group {} .. dropping", client.get_server_group());
                         }
                     }
+                    else
+                    {
+                        error!("Server group {} not found on server for client {} .. dropping", client.get_server_group(), id);
+                    }
                 }
+                else
+                {
+                    error!("Client id {} not found in server records .. dropping", id);
+                }
+            }
+			else
+			{
+                error!("No email found for complete partial connection.. dropping.");
             }
         }
     }
@@ -195,7 +221,7 @@ impl LoadBalancer
         }
         else
         {
-            // TODO: Log / handle error
+            error!("Client {client_id} not found to insert connection .. dropping connection")
         }
     }
 }

@@ -432,26 +432,38 @@ impl HealthChecker
                 if now > idle_ts + 30
                 {
                     // Connect
-                    // TODO: use connect_timeout
-                    // TODO: Or use thread
-                    match TcpStream::connect(self.address.clone())
+                    match self.address.clone().parse()
                     {
-                        Ok(stream) =>
+                        Ok(sock_addr) =>
                         {
-                            stream.set_read_timeout(Some(Duration::from_millis(1)))?;
-                            stream.set_write_timeout(Some(Duration::from_millis(1)))?;
-                            stream.set_nonblocking(true)?;
-                            stream.set_nodelay(true)?;
+                            match TcpStream::connect_timeout(&sock_addr, Duration::from_millis(100))
+                            {
+                                Ok(stream) =>
+                                {
+                                    stream.set_read_timeout(Some(Duration::from_millis(1)))?;
+                                    stream.set_write_timeout(Some(Duration::from_millis(1)))?;
+                                    stream.set_nonblocking(true)?;
+                                    stream.set_nodelay(true)?;
 
-                            self.up_stream = Some(stream);
+                                    self.up_stream = Some(stream);
 
-                            next_state = PingState::CONNECTED;
+                                    next_state = PingState::CONNECTED;
+                                },
+                                Err(e) =>
+                                {
+                                    self.upstream_state = UpstreamState::UNHEALTHY;
+                                    next_state = PingState::IDLE(now);
+                                    error!("{} set to UNHEALTHY", self.server_id);
+                                    error!("{e}");
+                                }
+                            }
                         },
                         Err(e) =>
                         {
                             self.upstream_state = UpstreamState::UNHEALTHY;
                             next_state = PingState::IDLE(now);
                             error!("{} set to UNHEALTHY", self.server_id);
+                            error!("{e}");
                         }
                     }
                 }

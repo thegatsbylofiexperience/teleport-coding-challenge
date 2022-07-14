@@ -12,7 +12,7 @@ use rustls;
 
 use x509_parser::prelude::*;
 
-use log::{info, warn, error};
+use log::{trace, debug, info, warn, error};
 
 pub struct Client
 {
@@ -104,8 +104,8 @@ fn test_client_cleanup()
 
         match i
         {
-            0 => { cxn.conn_state = ConnState::INIT; },
-            1 => { cxn.conn_state = ConnState::UP_CONNECTED; },
+            0 => { cxn.conn_state = ConnState::OKAY; },
+            1 => { cxn.conn_state = ConnState::OKAY; },
             2 => { cxn.conn_state = ConnState::OKAY; },
             3 => { cxn.conn_state = ConnState::UP_DISCONNECT; },
             4 => { cxn.conn_state = ConnState::UP_TIMEOUT; },
@@ -251,7 +251,7 @@ fn extract_email_from_cert(cert: &Vec<u8>) -> Result<String, Box<dyn std::error:
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
-enum ConnState
+pub enum ConnState
 {
     OKAY,
     UP_DISCONNECT,
@@ -281,7 +281,7 @@ impl Connection
     pub fn from_partial_connection(partial_cxn: PartialConnection, upstream_serv_group: u32, upstream_serv_id: u32, up_stream_addr: &String) -> Result<Self, Box<dyn std::error::Error>>
     {
         // TODO: Blocking call. Move to call with a timeout or wrap in a thread.
-        let up_stream = std::net::TcpStream::connect(up_stream_addr)?;
+        let up_stream = std::net::TcpStream::connect_timeout(&up_stream_addr.parse()?, Duration::from_millis(100))?;
         up_stream.set_read_timeout(Some(Duration::from_millis(1)))?;
         up_stream.set_write_timeout(Some(Duration::from_millis(1)))?;
         up_stream.set_nonblocking(true)?;
@@ -317,7 +317,7 @@ impl Connection
                 {
                     Ok(n) =>
                     {
-                        info!("Received: {n} bytes");
+                        debug!("Received: {n} bytes");
 
                         if n == 0
                         {
@@ -361,6 +361,8 @@ impl Connection
                 {
                     Ok(n) =>
                     {
+                        debug!("Sent: {n} bytes");
+
                         if n == 0
                         {
                             next_state = ConnState::UP_DISCONNECT;
@@ -371,15 +373,9 @@ impl Connection
                             // write buffer back
                             match tls_stream.write_all(&up_buf[0..n])
                             {
-                                Ok(_n) =>
+                                Ok(()) =>
                                 {
-                                    if n == 0
-                                    {
-                                        next_state = ConnState::DOWN_DISCONNECT;
-                                        error!("Client DC");
-                                    }
-
-                                    // otherwise Great!
+                                    // Great!
                                 },
                                 Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock =>
                                 {
@@ -416,6 +412,11 @@ impl Connection
         self.conn_state = next_state;
 
         Ok(())
+    }
+
+    pub fn get_state(&self) -> ConnState
+    {
+        self.conn_state.clone()
     }
 }
 

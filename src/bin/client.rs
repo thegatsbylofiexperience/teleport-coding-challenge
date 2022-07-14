@@ -64,12 +64,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
     std::thread::sleep(Duration::from_millis(1000));
 
     let mut tls_stream = rustls::Stream::new(&mut tls_conn, &mut stream);
+    
+    let mut cnt : usize = 0;
 
-    for i in 0..10
+    loop
     {
-        info!("sending: HELLO_{i}");
+        info!("sending: HELLO_{cnt}");
 
-        match tls_stream.write_all(format!("HELLO_{i}").as_bytes())
+        match tls_stream.write_all(format!("HELLO_{cnt}").as_bytes())
         {
             Ok(()) =>
             {
@@ -84,33 +86,37 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
                 return Err(e.into());
             }
         }
-    }
 
-    loop
-    {
-        let mut buf : [u8; 1024] = [0; 1024];
+        cnt += 1;
 
-        match tls_stream.read(&mut buf)
+        for i in 0..5
         {
-            Ok(n) =>
+            let mut buf : [u8; 1024] = [0; 1024];
+
+            match tls_stream.read(&mut buf)
             {
-                if n == 0
+                Ok(n) =>
                 {
-                    return Err("Connection closed".into());
+                    if n == 0
+                    {
+                        return Err("Connection closed".into());
+                    }
+                    info!("recv: {:?}", String::from_utf8(buf[0..n].to_vec())?);
+                },
+                Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock =>
+                {
+                    // wait for next poll
+                },
+                Err(e) =>
+                {
+                    return Err(e.into());
                 }
-                info!("recv: {:?}", String::from_utf8(buf[0..n].to_vec())?);
-            },
-            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock =>
-            {
-                // wait for next poll
-            },
-            Err(e) =>
-            {
-                return Err(e.into());
             }
+
+            std::thread::sleep(Duration::from_millis(10));
         }
 
-        std::thread::sleep(Duration::from_millis(10));
+        std::thread::sleep(Duration::from_millis(1000));
     }
 
     Ok(())

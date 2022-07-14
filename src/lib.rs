@@ -93,7 +93,7 @@ impl LoadBalancer
 
     fn handle_clients(&mut self) -> Result<(), Box<dyn std::error::Error>>
     {
-        for (_k,v) in self.clients.iter_mut()
+        for (k,v) in self.clients.iter_mut()
         {
             v.poll()?;
 
@@ -104,6 +104,8 @@ impl LoadBalancer
                 {
                     server_group.remove_connection(&v.get_upstream_server_id());
                 }
+
+                info!("Client {k}: removing connection from server group: {} id: {} reason: {:?}.", v.get_upstream_server_group(), v.get_upstream_server_group(), v.get_state());
             }
         }
 
@@ -133,7 +135,7 @@ impl LoadBalancer
                 {
                     if v.is_completed()
                     {
-						info!("{} is complete and authed to client {:?}", i, v.client_id());
+						info!("Partial connection is complete and authed to client {:?}", v.client_id());
 
                         to_complete.push(i);
                     }

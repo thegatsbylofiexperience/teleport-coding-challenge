@@ -30,11 +30,11 @@ pub struct LoadBalancer
 
 impl LoadBalancer
 {
-    fn new(config: Arc<rustls::ServerConfig>) -> Result<Self, Box<dyn std::error::Error>>
+    fn new(config: Arc<rustls::ServerConfig>, port: u16) -> Result<Self, Box<dyn std::error::Error>>
     {
-        let listener = TcpListener::bind("127.0.0.1:8443")?;
+        let listener = TcpListener::bind(format!("127.0.0.1:{port}"))?;
 
-		info!("Listening on 127.0.0.1:8443");
+		info!("Listening on 127.0.0.1:{port}");
         
 		listener.set_nonblocking(true)?;
 

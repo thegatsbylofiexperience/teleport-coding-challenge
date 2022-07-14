@@ -24,7 +24,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
 
     {
         let mut ap = ArgumentParser::new();
-        ap.set_description("TLS 1.3 Client");
+        ap.set_description("TLS 1.3 Upstream Server");
         ap.refer(&mut port).add_option(&["--port"], Store, "The port that the upstream will listen to on localhost.");
         ap.parse_args_or_exit();
     }

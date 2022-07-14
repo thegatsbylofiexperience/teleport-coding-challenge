@@ -37,9 +37,17 @@ fn load_private_key(filename: &str) -> Result<rustls::PrivateKey, Box<dyn std::e
     return Err(format!("no keys found in {:?} (encrypted keys not supported)", filename).into());
 }
 
-fn create_server_tls_config() -> Result<Arc<rustls::ServerConfig>, Box<dyn std::error::Error>>
+fn create_server_tls_config(other_certs: bool) -> Result<Arc<rustls::ServerConfig>, Box<dyn std::error::Error>>
 {
-    let roots = load_certs("certs/cert/ec-cacert.pem".into())?;
+    let roots = if !other_certs
+                {
+                    load_certs("certs/cert/ec-cacert.pem".into())?
+                }
+                else
+                {
+                    load_certs("other_certs/cert/ec-cacert.pem".into())?
+                };
+
     let mut client_auth_roots = RootCertStore::empty();
     for root in roots
     {
@@ -55,9 +63,23 @@ fn create_server_tls_config() -> Result<Arc<rustls::ServerConfig>, Box<dyn std::
 
     let versions : Vec<&'static rustls::SupportedProtocolVersion> = vec![&rustls::version::TLS13];
 
-    let certs = load_certs("certs/server.pem")?;
+    let certs = if ! other_certs
+                {
+                    load_certs("certs/server.pem")?
+                }
+                else
+                {
+                    load_certs("other_certs/server.pem")?
+                };
 
-    let privkey = load_private_key("certs/server.key")?;
+    let privkey = if ! other_certs
+                  {
+                       load_private_key("certs/server.key")?
+                  }
+                  else
+                  {
+                       load_private_key("other_certs/server.key")?
+                  };
 
     let ocsp : Vec<u8> = vec![];
 
@@ -73,11 +95,19 @@ fn create_server_tls_config() -> Result<Arc<rustls::ServerConfig>, Box<dyn std::
     Ok(Arc::new(config))
 }
 
-pub fn create_client_tls_config(id: &String) -> Result<Arc<rustls::ClientConfig>, Box<dyn std::error::Error>>
+pub fn create_client_tls_config(other_certs: bool, id: &String) -> Result<Arc<rustls::ClientConfig>, Box<dyn std::error::Error>>
 {
     let mut root_store = RootCertStore::empty(); 
 
-    let certfile = std::fs::File::open(&"certs/cert/ec-cacert.pem")?;
+    let certfile = if !other_certs
+                   {
+                       std::fs::File::open(&"certs/cert/ec-cacert.pem")?
+                   }
+                   else
+                   {
+                       std::fs::File::open(&"other_certs/cert/ec-cacert.pem")?
+                   };
+
     let mut reader = BufReader::new(certfile);
     root_store.add_parsable_certificates(&rustls_pemfile::certs(&mut reader)?);
 
@@ -94,8 +124,23 @@ pub fn create_client_tls_config(id: &String) -> Result<Arc<rustls::ClientConfig>
                  .with_protocol_versions(&versions)?
                  .with_root_certificates(root_store);
 
-    let certs = load_certs(&format!("certs/{id}.crt"))?;
-    let key = load_private_key(&format!("certs/{id}.key"))?;
+    let certs = if !other_certs
+                {
+                    load_certs(&format!("certs/{id}.crt"))?
+                }
+                else
+                {
+                    load_certs(&format!("other_certs/{id}.crt"))?
+                };
+
+    let key = if !other_certs
+              {
+                  load_private_key(&format!("certs/{id}.key"))?
+              }
+              else
+              {
+                  load_private_key(&format!("other_certs/{id}.key"))?
+              };
 
     let mut conf = config.with_single_cert(certs, key)?;
 
@@ -104,11 +149,11 @@ pub fn create_client_tls_config(id: &String) -> Result<Arc<rustls::ClientConfig>
     Ok(Arc::new(conf))
 }
 
-pub fn load_configuration() -> Result<LoadBalancer, Box<dyn std::error::Error>>
+pub fn load_configuration(port: u16, other_certs: bool) -> Result<LoadBalancer, Box<dyn std::error::Error>>
 {
-	let tls_conf = create_server_tls_config()?;
+	let tls_conf = create_server_tls_config(other_certs)?;
 
-    let mut lb = LoadBalancer::new(tls_conf)?;
+    let mut lb = LoadBalancer::new(tls_conf, port)?;
 
     lb.clients.insert("first@first.com".into(), Client::new("first@first.com".into(), 0));
     lb.clients.insert("second@second.com".into(), Client::new("second@second.com".into(), 1));

@@ -13,20 +13,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
 {
     SimpleLogger::new().with_level(log::LevelFilter::Debug).init().unwrap();
 
-    let mut id = "".to_string();
+    let mut id          = "".to_string();
+    let mut port : u16  = 8443;
+    let mut other_certs = false;
 
     {
         let mut ap = ArgumentParser::new();
         ap.set_description("TLS 1.3 Client");
         ap.refer(&mut id).add_option(&["--id"], Store, "Client ID that refers to the cert beinf used. E.G. --id 'first'");
+        ap.refer(&mut port).add_option(&["--port"], Store, "The port that client will connect to on localhost. default: 8443");
+        ap.refer(&mut other_certs).add_option(&["--other"], StoreTrue, "This flag changes the ca that has signed the server cert -- to test authentication with different CAs. NOTE: there is onlt first client with alternate ca.");
         ap.parse_args_or_exit();
     }
 
     info!("Init Client!");
     
-    let client_config = config::create_client_tls_config(&id)?;
+    let client_config = config::create_client_tls_config(other_certs, &id)?;
 
-    let mut stream = std::net::TcpStream::connect("127.0.0.1:8443")?;
+    let mut stream = std::net::TcpStream::connect(format!("127.0.0.1:{port}"))?;
 
     info!("Connected to 127.0.0.1:8443");
 

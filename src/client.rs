@@ -48,7 +48,31 @@ impl Client
 
     pub fn add_connection(&mut self, cxn: Connection)
     {
-        self.connections.push(cxn);
+        // convert current ts to i64 and divide 30 to give current 30s period
+        let now : i64 = chrono::Utc::now().timestamp() / 30;
+
+        let mut ok = true;
+
+        if now == self.cxn_time
+        {
+            if self.cxn_cnt >= 10
+            {
+                ok = false;
+                error!("Client rate limit hit for {}", self.email);
+            }
+        }
+        // cxn_time does not match start a new 30s period
+        else
+        {
+            self.cxn_time = now;
+            self.cxn_cnt  = 0;
+        }
+
+        if ok
+        {
+            self.connections.push(cxn);
+            self.cxn_cnt += 1;
+        }
     }
 
     pub fn cleanup_connections(&mut self) -> Vec<Connection>
@@ -317,7 +341,7 @@ impl Connection
                 {
                     Ok(n) =>
                     {
-                        debug!("Received: {n} bytes");
+                        trace!("Received: {n} bytes");
 
                         if n == 0
                         {
@@ -361,7 +385,7 @@ impl Connection
                 {
                     Ok(n) =>
                     {
-                        debug!("Sent: {n} bytes");
+                        trace!("Sent: {n} bytes");
 
                         if n == 0
                         {

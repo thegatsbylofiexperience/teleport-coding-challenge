@@ -1,4 +1,4 @@
-#[allow(non_camel_case_types)]
+#![allow(non_camel_case_types, unused_variables)]
 
 use std::net::{TcpListener, TcpStream};
 use std::collections::*;
@@ -8,6 +8,11 @@ use std::io::Read;
 
 use std::time::Duration;
 
+use std::sync::Arc;
+use rustls;
+
+use x509_parser::prelude::*;
+
 pub mod config;
 
 pub struct LoadBalancer
@@ -16,17 +21,18 @@ pub struct LoadBalancer
     server_groups   : HashMap<u32, ServerGroup>, // server group id, ServerGroup
     partial_conns   : Vec<PartialConnection>,
     listener        : std::net::TcpListener,
+    config          : Arc<rustls::ServerConfig>,
 }
 
 impl LoadBalancer
 {
-    fn new() -> Result<Self, Box<dyn std::error::Error>>
+    fn new(config: Arc<rustls::ServerConfig>) -> Result<Self, Box<dyn std::error::Error>>
     {
         let listener = TcpListener::bind("127.0.0.1:443")?;
 
         listener.set_nonblocking(true)?;
 
-        Ok(Self { clients : HashMap::new(), server_groups : HashMap::new(), partial_conns: vec![], listener })
+        Ok(Self { clients : HashMap::new(), server_groups : HashMap::new(), partial_conns: vec![], listener, config })
     }
 
     pub fn poll(&mut self) -> Result<(), Box<dyn std::error::Error>>
@@ -60,8 +66,10 @@ impl LoadBalancer
                     stream.set_write_timeout(Some(point_one_milli.clone()))?;
                     stream.set_nonblocking(true)?;
                     stream.set_nodelay(true)?;
+	
+					let tls_conn = rustls::ServerConnection::new(Arc::clone(&self.config))?;
 
-                    self.partial_conns.push(PartialConnection::new(stream));
+                    self.partial_conns.push(PartialConnection::new(stream, tls_conn));
 				},
     			Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock =>
     			{
@@ -80,7 +88,7 @@ impl LoadBalancer
 
     fn handle_clients(&mut self) -> Result<(), Box<dyn std::error::Error>>
     {
-        for (k,v) in self.clients.iter_mut()
+        for (_k,v) in self.clients.iter_mut()
         {
             v.poll()?;
 
@@ -99,7 +107,7 @@ impl LoadBalancer
 
     fn handle_server_groups(&mut self) -> Result<(), Box<dyn std::error::Error>>
     {
-        for (k, v) in self.server_groups.iter_mut()
+        for (_k, v) in self.server_groups.iter_mut()
         {
             v.poll()?;
         }
@@ -123,7 +131,7 @@ impl LoadBalancer
                         to_complete.push(i);
                     }
                 },
-                Err(e) =>
+                Err(_e) =>
                 {
                     to_remove.push(i);
                 }
@@ -162,7 +170,7 @@ impl LoadBalancer
                                         // add to client connections list
                                         self.insert_connection(&id, conn);
                                     },
-                                    Err(e) =>
+                                    Err(_e) =>
                                     {
                                         //TODO: Log errors
                                     }
@@ -294,7 +302,6 @@ fn test_client_cleanup()
 enum PartialConnState
 {
     INIT,
-    AUTHENTICATING,
     COMPLETED,
     ERROR,
 }
@@ -304,6 +311,7 @@ enum PartialConnState
 struct PartialConnection
 {
     down_stream         : std::net::TcpStream,
+    tls_conn            : rustls::ServerConnection,
     state               : PartialConnState,
     email_address       : Option<String>,
     
@@ -311,9 +319,9 @@ struct PartialConnection
 
 impl PartialConnection
 {
-    fn new(down_stream: std::net::TcpStream) -> Self
+    fn new(down_stream: std::net::TcpStream, tls_conn: rustls::ServerConnection) -> Self
     {
-        Self { down_stream, state: PartialConnState::INIT, email_address: None }
+        Self { down_stream, tls_conn, state: PartialConnState::INIT, email_address: None }
     }
 
     fn poll(&mut self, ) -> Result<(), Box<dyn std::error::Error>>
@@ -325,11 +333,87 @@ impl PartialConnection
             PartialConnState::INIT =>
             {
                 // Handle authentication / authorisation
-                // TODO: Actually do authentication and authorization in a later pull req
-                // Currently hardcoding 
-                self.email_address = Some("first@first.com".to_string());
+                if self.tls_conn.is_handshaking()
+                {
+				    if self.tls_conn.wants_read()
+                    {
+                        match self.tls_conn.read_tls(&mut self.down_stream)
+                        {
+                            Ok(n) =>
+                            {
+                                if n == 0
+                                {
+                                    next_state = PartialConnState::ERROR;
+                                }
+                                else
+                                {
+                                    if let Ok(_io_state) = self.tls_conn.process_new_packets()
+                                    {
+                                        // we are handshaking so we want to process the handshake packets 
+                                    }
+                                    else
+                                    {
+                                        next_state = PartialConnState::ERROR;
+                                    }
+                                }
+                            },
+                            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock =>
+                            {
+                                // wait for next poll
+                            },
+                            Err(_e) =>
+                            {
+                                next_state = PartialConnState::ERROR;
+                            }
+                        }
+                    }
 
-                next_state = PartialConnState::COMPLETED;
+                    if self.tls_conn.wants_write()
+                    {
+                        match self.tls_conn.write_tls(&mut self.down_stream)
+                        {
+                            Ok(n) =>
+                            {
+                                if n == 0
+                                {
+                                    next_state = PartialConnState::ERROR;
+                                }
+                            },
+                            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock =>
+                            {
+                                // wait for next poll
+                            },
+                            Err(_e) =>
+                            {
+                                next_state = PartialConnState::ERROR;
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    // handshake done
+                    // get cert
+                    if let Some(certs) = self.tls_conn.peer_certificates()
+                    {
+                        match extract_email_from_cert(&certs[0].0)
+                        {
+                            Ok(email) =>
+                            {
+                                self.email_address = Some(email);
+                                next_state = PartialConnState::COMPLETED;
+                            },
+                            Err(_e) =>
+                            {
+                                next_state = PartialConnState::ERROR;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        next_state = PartialConnState::ERROR;
+                    }
+                }
             },
             _ =>
             {
@@ -343,6 +427,7 @@ impl PartialConnection
         Ok(())
     }
 
+
     fn is_completed(&self) -> bool
     {
         return self.state == PartialConnState::COMPLETED;
@@ -354,11 +439,22 @@ impl PartialConnection
     }
 }
 
+fn extract_email_from_cert(cert: &Vec<u8>) -> Result<String, Box<dyn std::error::Error>>
+{
+    let (rem, cert) = X509Certificate::from_der(&cert[..])?;
+    if let Some(email_ext) = cert.get_extension_unique(&oid_registry::OID_PKCS9_EMAIL_ADDRESS)?
+    {
+        return Ok(String::from_utf8(email_ext.value.to_vec())?);
+    }
+    else
+    {
+        return Err("No email address found".into());
+    }
+}
+
 #[derive(Clone, PartialEq, Eq, Debug)]
 enum ConnState
 {
-    INIT,
-    UP_CONNECTED,
     OKAY,
     UP_DISCONNECT,
     UP_TIMEOUT,
@@ -371,7 +467,7 @@ struct Connection
 {
     down_stream         : std::net::TcpStream,
     up_stream           : std::net::TcpStream,
-//    tls                 : rustls::Stream, 
+    tls_conn            : rustls::ServerConnection,
     conn_state          : ConnState,
     upstream_serv_group : u32,
     upstream_serv_id    : u32,
@@ -379,18 +475,18 @@ struct Connection
 
 impl Connection
 {
-    fn new(down_stream: std::net::TcpStream, up_stream: std::net::TcpStream, upstream_serv_group: u32, upstream_serv_id: u32) -> Result<Self, Box<dyn std::error::Error>>
+    fn new(down_stream: std::net::TcpStream, up_stream: std::net::TcpStream, tls_conn: rustls::ServerConnection, upstream_serv_group: u32, upstream_serv_id: u32) -> Result<Self, Box<dyn std::error::Error>>
     {
 
-        Ok(Self { down_stream, up_stream, conn_state: ConnState::OKAY, upstream_serv_group, upstream_serv_id })
+        Ok(Self { down_stream, up_stream, tls_conn, conn_state: ConnState::OKAY, upstream_serv_group, upstream_serv_id })
     }
 
     fn from_partial_connection(partial_cxn: PartialConnection, upstream_serv_group: u32, upstream_serv_id: u32, up_stream_addr: &String) -> Result<Self, Box<dyn std::error::Error>>
     {
         // TODO: Blocking call. Move to call with a timeout or wrap in a thread.
-        let mut up_stream = std::net::TcpStream::connect(up_stream_addr)?;
+        let up_stream = std::net::TcpStream::connect(up_stream_addr)?;
 
-        Self::new(partial_cxn.down_stream, up_stream, upstream_serv_group, upstream_serv_id)
+        Self::new(partial_cxn.down_stream, up_stream, partial_cxn.tls_conn, upstream_serv_group, upstream_serv_id)
     }
 
     fn poll(&mut self) -> Result<(), Box<dyn std::error::Error>>
@@ -399,41 +495,45 @@ impl Connection
 
         match self.conn_state
         {
-            ConnState::INIT =>
-            {
-                //TODO: Figure out what to do here -> see next comment block
-            },
-            ConnState::UP_CONNECTED =>
-            {
-                //TODO: Figure out what to do here... this is not necessary unless we put the upstream
-                //      socket in a thread.
-                //      The TcpStream::connect() and connect_timeout() will block for some period.
-                //      For now I will use connect_timeout but I think a small amount of async/threading here
-                //      would / could make life easier 
-            },
             ConnState::OKAY =>
             {
-                let mut down_buf : [u8; 2048] = [0; 2048];
-                let mut up_buf   : [u8; 2048] = [0; 2048];
-
-                match self.down_stream.read(&mut down_buf)
+                match self.tls_conn.read_tls(&mut self.down_stream)
                 {
                     Ok(n) =>
                     {
-                        // write buffer back
-                        match self.up_stream.write_all(&down_buf[0..n])
+                        if n == 0
                         {
-                            Ok(n) =>
-                            {
-                                // Great!
-                            },
-                            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock =>
-                            {
-                                // wait for next poll
-                            },
-                            Err(e) =>
-                            {
-                                next_state = ConnState::UP_DISCONNECT;
+                            next_state = ConnState::DOWN_DISCONNECT;
+                        }
+                        else
+                        {
+					        if let Ok(io_state) = self.tls_conn.process_new_packets()
+							{
+					            if io_state.plaintext_bytes_to_read() > 0
+								{
+                					let mut buf = Vec::new();
+					                buf.resize(io_state.plaintext_bytes_to_read(), 0u8);
+
+                					self.tls_conn.reader().read_exact(&mut buf)
+                    				.unwrap();
+
+                                    // write buffer back
+                                    match self.up_stream.write_all(&buf)
+                                    {
+                                        Ok(()) =>
+                                        {
+                                            // Great!
+                                        },
+                                        Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock =>
+                                        {
+                                            // wait for next poll
+                                        },
+                                        Err(_e) =>
+                                        {
+                                            next_state = ConnState::UP_DISCONNECT;
+                                        }
+                                    }
+                                }
                             }
                         }
                     },
@@ -441,30 +541,45 @@ impl Connection
                     {
                         // wait for next poll
                     },
-                    Err(e) =>
+                    Err(_e) =>
                     {
                         next_state = ConnState::DOWN_DISCONNECT;
                     }
                 }
 
+                let mut up_buf   : [u8; 2048] = [0; 2048];
                 match self.up_stream.read(&mut up_buf)
                 {
                     Ok(n) =>
                     {
-                        // write buffer back
-                        match self.down_stream.write_all(&up_buf[0..n])
+                        if n == 0
                         {
-                            Ok(n) =>
+                            next_state = ConnState::UP_DISCONNECT;
+                        }
+                        else
+                        {
+                            self.tls_conn.writer().write_all(&up_buf[0..n]).unwrap();
+
+                            // write buffer back
+                            match self.tls_conn.write_tls(&mut self.down_stream)
                             {
-                                // Great!
-                            },
-                            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock =>
-                            {
-                                // wait for next poll
-                            },
-                            Err(e) =>
-                            {
-                                next_state = ConnState::DOWN_DISCONNECT;
+                                Ok(_n) =>
+                                {
+                                    if n == 0
+                                    {
+                                        next_state = ConnState::UP_DISCONNECT;
+                                    }
+
+                                    // otherwise Great!
+                                },
+                                Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock =>
+                                {
+                                    // wait for next poll
+                                },
+                                Err(_e) =>
+                                {
+                                    next_state = ConnState::DOWN_DISCONNECT;
+                                }
                             }
                         }
                     },
@@ -472,7 +587,7 @@ impl Connection
                     {
                         // wait for next poll
                     },
-                    Err(e) =>
+                    Err(_e) =>
                     {
                         next_state = ConnState::UP_DISCONNECT;
                     }
@@ -1090,7 +1205,7 @@ impl ServerGroup
 
     fn poll(&mut self) -> Result<(), Box<dyn std::error::Error>>
     {
-        for (k, v) in self.server_health.iter_mut()
+        for (_k, v) in self.server_health.iter_mut()
         {
             v.poll()?;
         }

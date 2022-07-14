@@ -6,9 +6,9 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-rustls = "0.20"
-rustls-pemfile = "1.0"
-x509-parser = "0.14"
-chrono = "0.4"
-
+rustls          = "0.20"
+rustls-pemfile  = "1.0"
+x509-parser     = "0.14"
+chrono          = "0.4"
+log             = "0.4"
 

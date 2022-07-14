@@ -104,7 +104,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>>
 
         cnt += 1;
 
-        for i in 0..5
+        for _i in 0..5
         {
             let mut buf : [u8; 1024] = [0; 1024];
 

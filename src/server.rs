@@ -1,4 +1,4 @@
-#![allow(non_camel_case_types, unused_variables)]
+#![allow(non_camel_case_types, unused_variables, dead_code, unused_assignments, unused_imports)]
 
 use std::net::{TcpListener, TcpStream};
 use std::collections::*;

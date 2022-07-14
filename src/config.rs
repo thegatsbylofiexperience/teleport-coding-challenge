@@ -37,7 +37,7 @@ fn load_private_key(filename: &str) -> Result<rustls::PrivateKey, Box<dyn std::e
     return Err(format!("no keys found in {:?} (encrypted keys not supported)", filename).into());
 }
 
-fn create_server_tls_config(other_certs: bool) -> Result<Arc<rustls::ServerConfig>, Box<dyn std::error::Error>>
+pub fn create_server_tls_config(other_certs: bool) -> Result<Arc<rustls::ServerConfig>, Box<dyn std::error::Error>>
 {
     let roots = if !other_certs
                 {

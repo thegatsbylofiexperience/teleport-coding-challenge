@@ -3,20 +3,20 @@ Certificate:
         Version: 3 (0x2)
         Serial Number: 1 (0x1)
         Signature Algorithm: ecdsa-with-SHA256
-        Issuer: C=AU, ST=VIC, L=Melbourne, O=AwesomeCo
+        Issuer: C=AU, ST=VIC, L=Melbourne, O=AwesomeCo, CN=ca
         Validity
-            Not Before: Jul 14 14:59:53 2022 GMT
-            Not After : Jul 14 14:59:53 2023 GMT
+            Not Before: Jul 14 15:24:31 2022 GMT
+            Not After : Jul 14 15:24:31 2023 GMT
         Subject: C=AU, ST=VIC, O=AwesomeCo, CN=localhost
         Subject Public Key Info:
             Public Key Algorithm: id-ecPublicKey
                 Public-Key: (256 bit)
                 pub:
-                    04:45:d2:6c:e6:aa:49:4c:b0:2b:79:fa:1b:88:cf:
-                    16:1b:a4:f5:36:6c:a3:43:bf:3f:06:32:ed:ac:02:
-                    e0:29:c2:bf:2d:e0:ac:6b:9b:fd:c0:a7:50:4f:89:
-                    9a:99:28:6b:a6:bb:69:c7:36:3b:f0:c8:3a:4c:c9:
-                    6b:9c:06:42:6c
+                    04:3f:6a:10:d7:28:c6:dc:6c:26:21:02:71:7d:ab:
+                    7b:4e:36:6f:54:e0:fa:54:1a:58:78:94:c4:de:a9:
+                    ce:68:41:de:35:c9:08:81:a0:ec:0c:a5:41:62:d9:
+                    8f:f8:ec:fd:a2:c4:9f:b0:3a:ea:cf:29:e2:9e:33:
+                    19:72:23:ee:ae
                 ASN1 OID: prime256v1
                 NIST CURVE: P-256
         X509v3 extensions:
@@ -27,11 +27,11 @@ Certificate:
             Netscape Comment: 
                 OpenSSL Generated Server Certificate
             X509v3 Subject Key Identifier: 
-                69:D6:14:B2:72:5D:36:3E:6F:52:7D:ED:9E:7D:3A:A8:E0:1C:E6:7D
+                61:14:FF:80:53:FB:B3:A3:F4:C7:1C:A9:B5:0C:F6:A0:60:D4:C6:D2
             X509v3 Authority Key Identifier: 
-                keyid:50:E7:BD:40:FF:A0:1B:A0:B2:A2:B6:22:CB:95:FC:53:13:67:BE:1C
-                DirName:/C=AU/ST=VIC/L=Melbourne/O=AwesomeCo
-                serial:74:B9:D3:6C:1F:E9:FA:51:D6:9D:36:17:C4:7B:EB:59:EB:6F:DE:B8
+                keyid:0E:A5:94:1C:5F:CB:3C:25:E9:37:61:AD:4F:DA:38:EB:E3:42:85:4E
+                DirName:/C=AU/ST=VIC/L=Melbourne/O=AwesomeCo/CN=ca
+                serial:08:F3:87:12:01:64:85:38:9A:6C:DB:A2:2F:DD:65:F6:38:13:55:54
 
             X509v3 Key Usage: critical
                 Digital Signature, Key Encipherment
@@ -40,24 +40,24 @@ Certificate:
             X509v3 Subject Alternative Name: 
                 IP Address:127.0.0.1, DNS:localhost
     Signature Algorithm: ecdsa-with-SHA256
-         30:45:02:21:00:8f:04:ee:43:d3:50:e0:23:74:c3:21:68:46:
-         72:1b:f8:e0:e5:d2:18:41:9b:77:e9:c5:b4:44:07:d5:56:7e:
-         0d:02:20:2b:e3:e3:70:be:99:10:6f:6a:26:8f:39:f1:47:ae:
-         48:14:ce:0d:de:ba:4f:7b:61:34:08:f4:74:b3:a7:68:45
+         30:43:02:1f:19:d0:1f:2b:06:69:70:12:b0:41:57:d9:fe:61:
+         d9:da:27:e9:40:4a:a2:e4:ee:5b:68:31:ea:51:97:ca:7a:02:
+         20:2b:f4:d4:c3:f0:51:8e:25:07:ed:4e:83:2e:31:79:a8:b6:
+         fa:0b:95:76:10:09:4a:e4:64:83:9a:2b:e0:49:6d
 -----BEGIN CERTIFICATE-----
-MIICrjCCAlSgAwIBAgIBATAKBggqhkjOPQQDAjBDMQswCQYDVQQGEwJBVTEMMAoG
+MIICyTCCAnGgAwIBAgIBATAKBggqhkjOPQQDAjBQMQswCQYDVQQGEwJBVTEMMAoG
 A1UECAwDVklDMRIwEAYDVQQHDAlNZWxib3VybmUxEjAQBgNVBAoMCUF3ZXNvbWVD
-bzAeFw0yMjA3MTQxNDU5NTNaFw0yMzA3MTQxNDU5NTNaMEMxCzAJBgNVBAYTAkFV
-MQwwCgYDVQQIDANWSUMxEjAQBgNVBAoMCUF3ZXNvbWVDbzESMBAGA1UEAwwJbG9j
-YWxob3N0MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAERdJs5qpJTLArefobiM8W
-G6T1NmyjQ78/BjLtrALgKcK/LeCsa5v9wKdQT4mamShrprtpxzY78Mg6TMlrnAZC
-bKOCATcwggEzMAkGA1UdEwQCMAAwEQYJYIZIAYb4QgEBBAQDAgZAMDMGCWCGSAGG
-+EIBDQQmFiRPcGVuU1NMIEdlbmVyYXRlZCBTZXJ2ZXIgQ2VydGlmaWNhdGUwHQYD
-VR0OBBYEFGnWFLJyXTY+b1J97Z59OqjgHOZ9MH4GA1UdIwR3MHWAFFDnvUD/oBug
-sqK2IsuV/FMTZ74coUekRTBDMQswCQYDVQQGEwJBVTEMMAoGA1UECAwDVklDMRIw
-EAYDVQQHDAlNZWxib3VybmUxEjAQBgNVBAoMCUF3ZXNvbWVDb4IUdLnTbB/p+lHW
-nTYXxHvrWetv3rgwDgYDVR0PAQH/BAQDAgWgMBMGA1UdJQQMMAoGCCsGAQUFBwMB
-MBoGA1UdEQQTMBGHBH8AAAGCCWxvY2FsaG9zdDAKBggqhkjOPQQDAgNIADBFAiEA
-jwTuQ9NQ4CN0wyFoRnIb+ODl0hhBm3fpxbREB9VWfg0CICvj43C+mRBvaiaPOfFH
-rkgUzg3euk97YTQI9HSzp2hF
+bzELMAkGA1UEAwwCY2EwHhcNMjIwNzE0MTUyNDMxWhcNMjMwNzE0MTUyNDMxWjBD
+MQswCQYDVQQGEwJBVTEMMAoGA1UECAwDVklDMRIwEAYDVQQKDAlBd2Vzb21lQ28x
+EjAQBgNVBAMMCWxvY2FsaG9zdDBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABD9q
+ENcoxtxsJiECcX2re042b1Tg+lQaWHiUxN6pzmhB3jXJCIGg7AylQWLZj/js/aLE
+n7A66s8p4p4zGXIj7q6jggFHMIIBQzAJBgNVHRMEAjAAMBEGCWCGSAGG+EIBAQQE
+AwIGQDAzBglghkgBhvhCAQ0EJhYkT3BlblNTTCBHZW5lcmF0ZWQgU2VydmVyIENl
+cnRpZmljYXRlMB0GA1UdDgQWBBRhFP+AU/uzo/THHKm1DPagYNTG0jCBjQYDVR0j
+BIGFMIGCgBQOpZQcX8s8Jek3Ya1P2jjr40KFTqFUpFIwUDELMAkGA1UEBhMCQVUx
+DDAKBgNVBAgMA1ZJQzESMBAGA1UEBwwJTWVsYm91cm5lMRIwEAYDVQQKDAlBd2Vz
+b21lQ28xCzAJBgNVBAMMAmNhghQI84cSAWSFOJps26Iv3WX2OBNVVDAOBgNVHQ8B
+Af8EBAMCBaAwEwYDVR0lBAwwCgYIKwYBBQUHAwEwGgYDVR0RBBMwEYcEfwAAAYIJ
+bG9jYWxob3N0MAoGCCqGSM49BAMCA0YAMEMCHxnQHysGaXASsEFX2f5h2don6UBK
+ouTuW2gx6lGXynoCICv01MPwUY4lB+1Ogy4xeai2+guVdhAJSuRkg5or4Elt
 -----END CERTIFICATE-----

@@ -47,12 +47,12 @@ openssl ca -keyfile private/ec-cakey.pem -cert cert/ec-cacert.pem -in fourth.csr
 
 openssl verify -CAfile cert/ec-cacert.pem fourth.crt
 
-echo "=====================fifth======================================="
-openssl ecparam -out fifth.key -name prime256v1 -genkey
+#echo "=====================fifth======================================="
+#openssl ecparam -out fifth.key -name prime256v1 -genkey
 
-openssl req -new -key fifth.key -out fifth.csr -sha256
+#openssl req -new -key fifth.key -out fifth.csr -sha256
 
-openssl ca -keyfile private/bad-ec-cakey.pem -cert cert/bad-ec-cacert.pem -in fifth.csr -out fifth.crt -config ./openssl.cnf -extfile client_ext.cnf
+#openssl ca -keyfile private/bad-ec-cakey.pem -cert cert/bad-ec-cacert.pem -in fifth.csr -out fifth.crt -config ./openssl.cnf -extfile client_ext.cnf
 
-openssl verify -CAfile cert/ec-cacert.pem fifth.crt
+#openssl verify -CAfile cert/ec-cacert.pem fifth.crt
 

@@ -5,15 +5,26 @@ use teleport_coding_challenge::config;
 use std::time::Duration;
 use simple_logger::SimpleLogger;
 
+use argparse::{ArgumentParser, StoreTrue, Store};
+
 use log::{warn, info, error};
 
 fn main() -> Result<(), Box<dyn std::error::Error>>
 {
     SimpleLogger::new().with_level(log::LevelFilter::Debug).init().unwrap();
 
+    let mut id = "".to_string();
+
+    {
+        let mut ap = ArgumentParser::new();
+        ap.set_description("TLS 1.3 Client");
+        ap.refer(&mut id).add_option(&["--id"], Store, "Client ID that refers to the cert beinf used. E.G. --id 'first'");
+        ap.parse_args_or_exit();
+    }
+
     info!("Init Client!");
     
-    let client_config = config::create_client_tls_config()?;
+    let client_config = config::create_client_tls_config(&id)?;
 
     let mut stream = std::net::TcpStream::connect("127.0.0.1:8443")?;
 

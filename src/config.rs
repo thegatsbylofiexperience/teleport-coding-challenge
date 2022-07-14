@@ -73,7 +73,7 @@ fn create_server_tls_config() -> Result<Arc<rustls::ServerConfig>, Box<dyn std::
     Ok(Arc::new(config))
 }
 
-pub fn create_client_tls_config() -> Result<Arc<rustls::ClientConfig>, Box<dyn std::error::Error>>
+pub fn create_client_tls_config(id: &String) -> Result<Arc<rustls::ClientConfig>, Box<dyn std::error::Error>>
 {
     let mut root_store = RootCertStore::empty(); 
 
@@ -94,8 +94,8 @@ pub fn create_client_tls_config() -> Result<Arc<rustls::ClientConfig>, Box<dyn s
                  .with_protocol_versions(&versions)?
                  .with_root_certificates(root_store);
 
-    let certs = load_certs("certs/client.crt")?;
-    let key = load_private_key("certs/client.key")?;
+    let certs = load_certs(&format!("certs/{id}.crt"))?;
+    let key = load_private_key(&format!("certs/{id}.key"))?;
 
     let mut conf = config.with_single_cert(certs, key)?;
 

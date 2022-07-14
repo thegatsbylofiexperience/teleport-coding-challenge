@@ -5,6 +5,7 @@ use std::io::Read;
 use std::io::Write;
 use log::{warn, info, error};
 use simple_logger::SimpleLogger;
+use argparse::{ArgumentParser, StoreTrue, Store};
 
 
 // Upstream Server
@@ -18,11 +19,23 @@ use simple_logger::SimpleLogger;
 fn main() -> Result<(), Box<dyn std::error::Error>>
 {
     SimpleLogger::new().with_level(log::LevelFilter::Debug).init().unwrap();
+    
+    let mut port : u16 = 2500;
+
+    {
+        let mut ap = ArgumentParser::new();
+        ap.set_description("TLS 1.3 Client");
+        ap.refer(&mut port).add_option(&["--port"], Store, "The port that the upstream will listen to on localhost.");
+        ap.parse_args_or_exit();
+    }
 
     info!("INIT Upstream!");
 
-    let listener = std::net::TcpListener::bind("127.0.0.1:2500")?;
-    info!("listening on 127.0.0.1:2500");
+    let addr = format!("127.0.0.1:{port}");
+
+    let listener = std::net::TcpListener::bind(addr)?;
+
+    info!("listening on 127.0.0.1:{port}");
 
     listener.set_nonblocking(true)?;
 

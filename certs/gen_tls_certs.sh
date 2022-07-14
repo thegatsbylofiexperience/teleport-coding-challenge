@@ -17,16 +17,6 @@ openssl req -new -x509 -days 3650 -config ./openssl.cnf -extensions v3_ca -key p
 
 openssl x509 -noout -text -in cert/ec-cacert.pem | grep -i algorithm
 
-
-echo "==============Other CA GEN================="
-openssl ecparam -out private/bad-ec-cakey.pem -name prime256v1 -genkey
-
-openssl ecparam -in private/bad-ec-cakey.pem -text -noout
-
-openssl req -new -x509 -days 3650 -config ./openssl.cnf -extensions v3_ca -key private/bad-ec-cakey.pem -out cert/bad-ec-cacert.pem
-
-openssl x509 -noout -text -in cert/bad-ec-cacert.pem | grep -i algorithm
-
 echo "==============SERVER GEN================="
 
 openssl ecparam -out server.key -name prime256v1 -genkey
@@ -39,17 +29,4 @@ openssl ca -keyfile private/ec-cakey.pem -cert cert/ec-cacert.pem -in server.csr
 openssl verify -CAfile cert/ec-cacert.pem server.crt
 
 cat server.crt cert/ec-cacert.pem > server.pem
-
-echo "==============BAD SERVER GEN================="
-
-openssl ecparam -out bad-server.key -name prime256v1 -genkey
-
-
-openssl req -new -key bad-server.key -out bad-server.csr -sha256
-
-openssl ca -keyfile private/bad-ec-cakey.pem -cert cert/bad-ec-cacert.pem -in bad-server.csr -out bad-server.crt -config ./openssl.cnf -extfile server_ext.cnf
-
-openssl verify -CAfile cert/ec-cacert.pem bad-server.crt
-
-cat bad-server.crt cert/bad-ec-cacert.pem > server.pem
 

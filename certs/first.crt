@@ -1,22 +1,22 @@
 Certificate:
     Data:
         Version: 3 (0x2)
-        Serial Number: 3 (0x3)
+        Serial Number: 2 (0x2)
         Signature Algorithm: ecdsa-with-SHA256
-        Issuer: C=AU, ST=VIC, L=Melbourne, O=AwesomeCo
+        Issuer: C=AU, ST=VIC, L=Melbourne, O=AwesomeCo, CN=ca
         Validity
-            Not Before: Jul 14 15:01:07 2022 GMT
-            Not After : Jul 14 15:01:07 2023 GMT
+            Not Before: Jul 14 15:25:33 2022 GMT
+            Not After : Jul 14 15:25:33 2023 GMT
         Subject: C=AU, ST=VIC, O=AwesomeCo, CN=first/emailAddress=first@first.com
         Subject Public Key Info:
             Public Key Algorithm: id-ecPublicKey
                 Public-Key: (256 bit)
                 pub:
-                    04:82:a4:6d:ee:55:72:56:12:14:c1:d9:d6:5e:59:
-                    10:52:0d:3b:fb:ac:2a:3e:68:51:dd:a1:2a:e3:6b:
-                    70:0d:9e:d8:26:41:a3:6b:b4:af:1f:e5:01:58:56:
-                    aa:47:ed:a2:28:d7:67:61:e2:33:24:55:e7:79:03:
-                    cd:6c:19:40:d5
+                    04:69:3d:6d:39:1c:d9:97:0b:10:c6:4a:ce:f6:96:
+                    dd:8e:b2:97:66:8e:2e:3c:90:d8:5b:f4:00:2d:1c:
+                    3a:84:c3:17:60:96:33:d3:71:b9:b6:bb:fa:3a:95:
+                    35:a6:f6:f5:4b:ca:ef:37:51:c1:49:e3:31:fa:d2:
+                    2d:d4:3b:8b:f4
                 ASN1 OID: prime256v1
                 NIST CURVE: P-256
         X509v3 extensions:
@@ -27,31 +27,31 @@ Certificate:
             Netscape Comment: 
                 OpenSSL Generated Client Certificate
             X509v3 Subject Key Identifier: 
-                38:8A:29:F8:A4:1B:C6:0B:D9:80:7F:FE:01:FD:7F:9C:5A:18:BF:1E
+                54:19:16:FF:40:90:E8:22:A4:71:47:A4:50:E1:92:E6:FB:15:ED:98
             X509v3 Authority Key Identifier: 
-                keyid:50:E7:BD:40:FF:A0:1B:A0:B2:A2:B6:22:CB:95:FC:53:13:67:BE:1C
+                keyid:0E:A5:94:1C:5F:CB:3C:25:E9:37:61:AD:4F:DA:38:EB:E3:42:85:4E
 
             X509v3 Key Usage: critical
                 Digital Signature, Non Repudiation, Key Encipherment
             X509v3 Extended Key Usage: 
                 TLS Web Client Authentication, E-mail Protection
     Signature Algorithm: ecdsa-with-SHA256
-         30:45:02:21:00:9b:9a:a1:85:f7:18:99:d5:dc:8d:2d:f9:0e:
-         2c:97:04:99:0f:d0:d1:86:1d:6d:d0:92:3b:5d:d8:92:d6:78:
-         84:02:20:3d:12:e5:63:ac:4a:ea:f0:71:e3:dc:b7:5b:b8:6c:
-         e7:44:07:81:09:ed:07:5d:c0:49:fa:63:b6:a2:88:8f:6e
+         30:44:02:20:52:e4:3a:46:36:3c:4d:eb:75:20:19:bf:a9:43:
+         fa:a4:fd:33:ff:6b:43:ad:d2:a7:5a:81:71:de:b0:43:a9:0f:
+         02:20:61:18:c4:ed:9f:b3:da:09:9f:9b:00:10:8a:6c:ab:45:
+         01:33:8d:bc:34:75:2f:45:68:04:fb:cd:85:e5:f1:16
 -----BEGIN CERTIFICATE-----
-MIICVzCCAf2gAwIBAgIBAzAKBggqhkjOPQQDAjBDMQswCQYDVQQGEwJBVTEMMAoG
+MIICYzCCAgqgAwIBAgIBAjAKBggqhkjOPQQDAjBQMQswCQYDVQQGEwJBVTEMMAoG
 A1UECAwDVklDMRIwEAYDVQQHDAlNZWxib3VybmUxEjAQBgNVBAoMCUF3ZXNvbWVD
-bzAeFw0yMjA3MTQxNTAxMDdaFw0yMzA3MTQxNTAxMDdaMF8xCzAJBgNVBAYTAkFV
-MQwwCgYDVQQIDANWSUMxEjAQBgNVBAoMCUF3ZXNvbWVDbzEOMAwGA1UEAwwFZmly
-c3QxHjAcBgkqhkiG9w0BCQEWD2ZpcnN0QGZpcnN0LmNvbTBZMBMGByqGSM49AgEG
-CCqGSM49AwEHA0IABIKkbe5VclYSFMHZ1l5ZEFINO/usKj5oUd2hKuNrcA2e2CZB
-o2u0rx/lAVhWqkftoijXZ2HiMyRV53kDzWwZQNWjgcUwgcIwCQYDVR0TBAIwADAR
-BglghkgBhvhCAQEEBAMCBaAwMwYJYIZIAYb4QgENBCYWJE9wZW5TU0wgR2VuZXJh
-dGVkIENsaWVudCBDZXJ0aWZpY2F0ZTAdBgNVHQ4EFgQUOIop+KQbxgvZgH/+Af1/
-nFoYvx4wHwYDVR0jBBgwFoAUUOe9QP+gG6CyorYiy5X8UxNnvhwwDgYDVR0PAQH/
-BAQDAgXgMB0GA1UdJQQWMBQGCCsGAQUFBwMCBggrBgEFBQcDBDAKBggqhkjOPQQD
-AgNIADBFAiEAm5qhhfcYmdXcjS35DiyXBJkP0NGGHW3Qkjtd2JLWeIQCID0S5WOs
-SurwcePct1u4bOdEB4EJ7QddwEn6Y7aiiI9u
+bzELMAkGA1UEAwwCY2EwHhcNMjIwNzE0MTUyNTMzWhcNMjMwNzE0MTUyNTMzWjBf
+MQswCQYDVQQGEwJBVTEMMAoGA1UECAwDVklDMRIwEAYDVQQKDAlBd2Vzb21lQ28x
+DjAMBgNVBAMMBWZpcnN0MR4wHAYJKoZIhvcNAQkBFg9maXJzdEBmaXJzdC5jb20w
+WTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAARpPW05HNmXCxDGSs72lt2Ospdmji48
+kNhb9AAtHDqEwxdgljPTcbm2u/o6lTWm9vVLyu83UcFJ4zH60i3UO4v0o4HFMIHC
+MAkGA1UdEwQCMAAwEQYJYIZIAYb4QgEBBAQDAgWgMDMGCWCGSAGG+EIBDQQmFiRP
+cGVuU1NMIEdlbmVyYXRlZCBDbGllbnQgQ2VydGlmaWNhdGUwHQYDVR0OBBYEFFQZ
+Fv9AkOgipHFHpFDhkub7Fe2YMB8GA1UdIwQYMBaAFA6llBxfyzwl6TdhrU/aOOvj
+QoVOMA4GA1UdDwEB/wQEAwIF4DAdBgNVHSUEFjAUBggrBgEFBQcDAgYIKwYBBQUH
+AwQwCgYIKoZIzj0EAwIDRwAwRAIgUuQ6RjY8Tet1IBm/qUP6pP0z/2tDrdKnWoFx
+3rBDqQ8CIGEYxO2fs9oJn5sAEIpsq0UBM428NHUvRWgE+82F5fEW
 -----END CERTIFICATE-----

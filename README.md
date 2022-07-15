@@ -42,9 +42,9 @@ There are three executables:
 Their configs are mostly hard coded.
 The only changable things are ports and certificate configurations.
 
-- The load balancer listens on 127.0.0.1:8443 (hard coded).
+- The load balancer listens on 127.0.0.1:8443 (default).
 - The load balancer has the ability to select from two CAs for server cert and ca
-- The client connects to the load balancer @ 127.0.0.1:8443 (hard coded).
+- The client connects to the load balancer @ 127.0.0.1:8443 (default).
 - The client has the ability to select certificates and client keys from two different CAs 
 - The client also has the ability to select the client certificate (first second third and fourth) 
 - All executables use argparse (like python argparse) to document command line flags ->  use --help for more info
